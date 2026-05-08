@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>v5 — Pose-anchored ASCII · Eigen Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07070a;
+    --ink: #F5EDDC;
+    --soft: rgba(245, 237, 220, 0.50);
+    --line: rgba(245, 237, 220, 0.10);
+    --amber: #D97706;
+    --emerald: #10B981;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; height: 100%; overflow: hidden; }
+  body { cursor: crosshair; }
+
+  canvas#gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; }
+  video#cam { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding: 18px 36px; background: linear-gradient(to bottom, rgba(7,7,10,0.75), transparent); pointer-events: none; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  .nav > * { pointer-events: auto; }
+  .nav .left { justify-self: start; }
+  .nav .center { justify-self: center; }
+  .nav .right { justify-self: end; display: flex; gap: 22px; }
+  .nav .right a { color: var(--soft); text-decoration: none; }
+  .nav .right a:hover { color: var(--ink); }
+  .nav b { color: var(--amber); }
+
+  .meta { position: fixed; bottom: 32px; left: 36px; z-index: 10; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); line-height: 1.7; pointer-events: none; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .meta .live::before { content: '●'; color: var(--emerald); margin-right: 6px; animation: blink 1.6s ease-in-out infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .legend { position: fixed; bottom: 32px; right: 36px; z-index: 10; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--soft); line-height: 1.8; pointer-events: none; text-align: right; }
+  .legend span { display: inline-block; min-width: 80px; }
+  .legend b { color: var(--amber); font-weight: 600; }
+
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(7,7,10,0.94); backdrop-filter: blur(10px); z-index: 50; pointer-events: auto; padding: 24px; transition: opacity 0.4s; }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay-card { text-align: center; max-width: 560px; }
+  .overlay-tag { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--soft); margin-bottom: 18px; }
+  .overlay-h { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; font-size: 36px; line-height: 1.1; color: var(--ink); margin-bottom: 24px; }
+  .overlay-h em { color: var(--amber); }
+  .overlay-p { font-family: 'Newsreader', serif; font-size: 16px; line-height: 1.55; color: rgba(245,237,220,0.72); margin-bottom: 32px; }
+  .overlay-btn { display: inline-block; padding: 14px 28px; background: var(--amber); color: var(--bg); border: 0; border-radius: 2px; cursor: pointer; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; transition: background .2s; }
+  .overlay-btn:hover { background: #F59E0B; }
+  .err { color: #ff4d6d; margin-top: 16px; font-size: 12px; font-family: 'Geist Mono', monospace; }
+
+  .controls { position: fixed; top: 80px; right: 36px; z-index: 12; display: flex; flex-direction: column; gap: 8px; }
+  .controls button { padding: 8px 14px; border: 1px solid var(--line); background: rgba(15,15,20,0.78); color: var(--ink); font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; border-radius: 2px; transition: border-color .2s; }
+  .controls button:hover { border-color: var(--amber); }
+  .controls button.active { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+
+  /* Landmark debug overlay */
+  canvas#debugLandmarks { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; transition: opacity 0.3s; }
+  canvas#debugLandmarks.show { opacity: 0.6; }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<canvas id="debugLandmarks"></canvas>
+<video id="cam" autoplay playsinline muted></video>
+
+<nav class="nav">
+  <div class="left">EIGEN <b>ATLAS</b> · v5 · pose-anchored</div>
+  <div class="center">FACELANDMARKER · 478 PUNTOS · ANATOMICAL GLYPH MAPPING</div>
+  <div class="right">
+    <a href="https://atelier.eigenatlas.com">← Atelier</a>
+    <a href="https://github.com/Theovia/ascii-lab">github</a>
+  </div>
+</nav>
+
+<div class="controls">
+  <button data-mode="full" class="active">Full anatomy</button>
+  <button data-mode="bright">Brightness only</button>
+  <button id="mirrorBtn" class="active">Mirror</button>
+  <button id="debugBtn">Debug landmarks</button>
+</div>
+
+<div class="meta">
+  <span class="live"></span><b id="fpsLabel">— fps</b><br />
+  <b id="faceLabel">no face detected</b><br />
+  <span id="cellsLabel">— cells</span>
+</div>
+
+<div class="legend">
+  <span>Eyes</span> <b>O ◯ ●</b><br />
+  <span>Mouth</span> <b>~ — _</b><br />
+  <span>Brows</span> <b>\ / —</b><br />
+  <span>Skin</span> <b>. ' ` ,</b><br />
+  <span>Hair / bg</span> <b># % @ M</b>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-tag">— v5 · pose-anchored ASCII</div>
+    <h2 class="overlay-h">
+      Tu cara, descompuesta<br/>en <em>vocabulario anatómico</em>.
+    </h2>
+    <p class="overlay-p">
+      MediaPipe detecta cuatrocientos setenta y ocho puntos faciales en tiempo real. Cada cell del grid ASCII recibe un glifo distinto según la región anatómica donde cae — ojos, boca, cejas, piel, fondo. No es brillo. Es interpretación.
+    </p>
+    <button class="overlay-btn" id="startBtn">Activar cámara</button>
+    <div class="err" id="errMsg"></div>
+  </div>
+</div>
+
+<!-- Vertex shader -->
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+</script>
+
+<!-- Fragment shader: pose-anchored ASCII -->
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+
+uniform sampler2D u_image;
+uniform sampler2D u_atlas;
+uniform vec2 u_resolution;
+uniform vec2 u_imgSize;
+uniform float u_cellPx;
+uniform vec2 u_atlasGrid;
+
+// Anatomical region glyph offsets in atlas (each region gets its own range)
+uniform float u_brightRampStart;   // 0
+uniform float u_brightRampLen;     // 42
+uniform float u_eyeRampStart;
+uniform float u_eyeRampLen;
+uniform float u_mouthRampStart;
+uniform float u_mouthRampLen;
+uniform float u_browRampStart;
+uniform float u_browRampLen;
+uniform float u_skinRampStart;
+uniform float u_skinRampLen;
+
+// Face landmarks (in image UV [0,1])
+uniform float u_faceActive;        // 0/1
+uniform vec2 u_faceCenter;
+uniform vec2 u_faceSize;           // bounding box w/h
+uniform vec2 u_eyeL;
+uniform vec2 u_eyeR;
+uniform float u_eyeRadius;
+uniform vec2 u_mouth;
+uniform vec2 u_mouthSize;
+uniform vec2 u_browL;
+uniform vec2 u_browR;
+uniform float u_browRadius;
+uniform vec2 u_chin;
+
+uniform int u_renderMode;          // 0=full anatomy, 1=brightness only
+
+const vec3 BG = vec3(0.027, 0.027, 0.039);
+
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+void main() {
+  vec2 fragPx = v_uv * u_resolution;
+
+  float canvasAR = u_resolution.x / u_resolution.y;
+  float imgAR = u_imgSize.x / u_imgSize.y;
+  float marginScale = 0.96;
+  float fitH, fitW;
+  if (canvasAR > imgAR) { fitH = u_resolution.y * marginScale; fitW = fitH * imgAR; }
+  else                   { fitW = u_resolution.x * marginScale; fitH = fitW / imgAR; }
+  vec2 fitOrigin = (u_resolution - vec2(fitW, fitH)) * 0.5;
+
+  float cellW = u_cellPx;
+  float cellH = u_cellPx * 1.55;
+  vec2 cellSize = vec2(cellW, cellH);
+  vec2 inFit = fragPx - fitOrigin;
+  vec2 cellId = floor(inFit / cellSize);
+  vec2 cellOrigin = cellId * cellSize;
+  vec2 cellLocal = (inFit - cellOrigin) / cellSize;
+  vec2 cellCenterPx = fitOrigin + cellOrigin + cellSize * 0.5;
+  vec2 cellCenterUV = (cellCenterPx - fitOrigin) / vec2(fitW, fitH);
+
+  if (cellCenterUV.x < 0.0 || cellCenterUV.x > 1.0 || cellCenterUV.y < 0.0 || cellCenterUV.y > 1.0) {
+    outColor = vec4(BG, 1.0);
+    return;
+  }
+
+  vec4 src = texture(u_image, cellCenterUV);
+  float l = lum(src.rgb);
+  l = (l - 0.5) * 1.10 + 0.5;
+  l = clamp(l, 0.0, 1.0);
+
+  if (l < 0.04) { outColor = vec4(BG, 1.0); return; }
+
+  // ───── Determine anatomical region ─────
+  float rampStart = u_brightRampStart;
+  float rampLen = u_brightRampLen;
+  vec3 tintColor = vec3(1.0);   // neutral, take true RGB of source
+
+  if (u_renderMode == 0 && u_faceActive > 0.5) {
+    // Compute distances to each anatomical anchor
+    float dEyeL = distance(cellCenterUV, u_eyeL);
+    float dEyeR = distance(cellCenterUV, u_eyeR);
+    float dMouth = distance(cellCenterUV, u_mouth);
+    float dBrowL = distance(cellCenterUV, u_browL);
+    float dBrowR = distance(cellCenterUV, u_browR);
+
+    bool isEye = (dEyeL < u_eyeRadius) || (dEyeR < u_eyeRadius);
+    bool isMouth = abs(cellCenterUV.x - u_mouth.x) < u_mouthSize.x * 0.6
+                && abs(cellCenterUV.y - u_mouth.y) < u_mouthSize.y * 0.6;
+    bool isBrow = (dBrowL < u_browRadius) || (dBrowR < u_browRadius);
+
+    // Inside face oval?
+    vec2 faceD = (cellCenterUV - u_faceCenter) / (u_faceSize * 0.55);
+    float faceMaskDist = length(faceD);
+    bool insideFace = faceMaskDist < 1.0;
+
+    if (isEye) {
+      rampStart = u_eyeRampStart;
+      rampLen = u_eyeRampLen;
+      tintColor = vec3(1.0, 0.92, 0.78);
+    } else if (isBrow) {
+      rampStart = u_browRampStart;
+      rampLen = u_browRampLen;
+      tintColor = vec3(0.92, 0.78, 0.62);
+    } else if (isMouth) {
+      rampStart = u_mouthRampStart;
+      rampLen = u_mouthRampLen;
+      tintColor = vec3(1.0, 0.62, 0.55);
+    } else if (insideFace) {
+      rampStart = u_skinRampStart;
+      rampLen = u_skinRampLen;
+      tintColor = vec3(0.96, 0.85, 0.72);
+    }
+    // else: brightness ramp default, neutral tint
+  }
+
+  // Pick char in selected ramp
+  float charIdx = rampStart + floor(l * (rampLen - 0.0001));
+  charIdx = clamp(charIdx, 0.0, rampStart + rampLen - 1.0);
+
+  float ax = u_atlasGrid.x;
+  float ay = u_atlasGrid.y;
+  float col = mod(charIdx, ax);
+  float row = floor(charIdx / ax);
+  vec2 atlasCell = vec2(col, row);
+  vec2 atlasUV = (atlasCell + vec2(cellLocal.x, 1.0 - cellLocal.y)) / vec2(ax, ay);
+  atlasUV.x = clamp(atlasUV.x, atlasCell.x / ax + 0.001, (atlasCell.x + 1.0) / ax - 0.001);
+  atlasUV.y = clamp(atlasUV.y, atlasCell.y / ay + 0.001, (atlasCell.y + 1.0) / ay - 0.001);
+  float glyph = texture(u_atlas, atlasUV).r;
+  glyph = smoothstep(0.4, 0.6, glyph);
+
+  // True RGB color, tinted by anatomical region
+  vec3 color = src.rgb;
+  float baseLum = max(0.01, dot(color, vec3(0.333)));
+  float targetLum = 0.30 + l * 0.65;
+  float k = clamp(targetLum / baseLum, 0.4, 2.4);
+  color = clamp(color * k, 0.0, 1.0);
+  color = mix(color, color * tintColor, 0.45);
+
+  vec3 finalColor = mix(BG, color, glyph);
+  outColor = vec4(finalColor, 1.0);
+}
+</script>
+
+<script type="module">
+import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs';
+
+(async () => {
+  const canvas = document.getElementById('gl');
+  const debugCanvas = document.getElementById('debugLandmarks');
+  const dctx = debugCanvas.getContext('2d');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+  if (!gl) {
+    document.getElementById('errMsg').textContent = 'WebGL2 not available';
+    return;
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const video = document.getElementById('cam');
+  const sample = document.createElement('canvas');
+  const sampleCtx = sample.getContext('2d', { willReadFrequently: false });
+
+  // ───── Glyph atlas: 5 anatomical ramps in single texture ─────
+  // Each ramp: ramp = sparse → dense progression for that region's char vocab
+  const RAMPS = {
+    bright: ' .\'`,:;!iI?ltjf1234567890[]{}|()*#$@%MW&8B',  // 42 chars
+    eye:    '.·:oO0◯●@',                                     // 9
+    mouth:  ' ._-~=−—•',                                      // 9
+    brow:   ' ./\\—_=#',                                      // 8
+    skin:   ' .,;:`\'\"~',                                     // 9
+  };
+  // Concat into single ramp + record offsets/lengths
+  let RAMP_FULL = '';
+  const offsets = {};
+  for (const [k, v] of Object.entries(RAMPS)) {
+    offsets[k] = { start: RAMP_FULL.length, len: v.length };
+    RAMP_FULL += v;
+  }
+
+  function compile(t, s) {
+    const sh = gl.createShader(t);
+    gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  }
+  function link(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  const vs = compile(gl.VERTEX_SHADER, document.getElementById('vs').textContent.trim());
+  const fs = compile(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent.trim());
+  const prog = link(vs, fs);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(prog, 'a_pos');
+
+  function buildAtlas() {
+    const cellPx = 64, cellH = Math.round(cellPx * 1.55);
+    const ax = 10;
+    const ay = Math.ceil(RAMP_FULL.length / ax);
+    const c = document.createElement('canvas');
+    c.width = ax * cellPx; c.height = ay * cellH;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, c.width, c.height);
+    cx.font = `600 ${Math.round(cellPx * 1.05)}px 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#fff';
+    for (let i = 0; i < RAMP_FULL.length; i++) {
+      const col = i % ax, row = Math.floor(i / ax);
+      cx.fillText(RAMP_FULL[i], col * cellPx + cellPx / 2, row * cellH + cellH / 2);
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    return { tex, ax, ay };
+  }
+  const atlas = buildAtlas();
+
+  // ───── MediaPipe FaceLandmarker ─────
+  let faceLandmarker = null;
+  async function initLandmarker() {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+    );
+    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      numFaces: 1,
+    });
+  }
+
+  let mirror = true;
+  let renderMode = 0;
+  let debugLandmarks = false;
+  let frameTexture = null;
+  let videoSize = [640, 480];
+
+  function uploadVideoTexture() {
+    if (!video.videoWidth) return;
+    if (!frameTexture) {
+      frameTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, frameTexture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    // Mirror-flip via offscreen canvas if mirror mode
+    sample.width = video.videoWidth; sample.height = video.videoHeight;
+    if (mirror) {
+      sampleCtx.save();
+      sampleCtx.translate(sample.width, 0);
+      sampleCtx.scale(-1, 1);
+      sampleCtx.drawImage(video, 0, 0);
+      sampleCtx.restore();
+    } else {
+      sampleCtx.drawImage(video, 0, 0);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, frameTexture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sample);
+    videoSize = [sample.width, sample.height];
+  }
+
+  // Landmarks → simplified anatomy points (in image UV)
+  // MediaPipe FaceMesh canonical indices:
+  const LM = {
+    eyeL_outer: 33, eyeL_inner: 133, eyeL_top: 159, eyeL_bot: 145,
+    eyeR_outer: 263, eyeR_inner: 362, eyeR_top: 386, eyeR_bot: 374,
+    mouth_top: 13, mouth_bot: 14, mouth_L: 78, mouth_R: 308,
+    browL_inner: 70, browL_outer: 105,
+    browR_inner: 300, browR_outer: 334,
+    chin: 152, forehead: 10,
+    faceL: 234, faceR: 454, faceTop: 10, faceBot: 152,
+  };
+
+  let currentFace = null;     // {center, size, eyeL, eyeR, mouth, mouthSize, browL, browR, chin, eyeR_radius, brow_radius}
+  let lastDetectTime = 0;
+
+  function detectFace(timestamp) {
+    if (!faceLandmarker || !video.videoWidth) return;
+    const result = faceLandmarker.detectForVideo(sample, timestamp);
+    if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
+      currentFace = null;
+      document.getElementById('faceLabel').textContent = 'no face detected';
+      return;
+    }
+    const lm = result.faceLandmarks[0];
+    const get = (i) => ({ x: lm[i].x, y: lm[i].y });
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+    const faceL = get(LM.faceL), faceR = get(LM.faceR);
+    const faceTop = get(LM.faceTop), faceBot = get(LM.faceBot);
+    const eyeL = mid(get(LM.eyeL_outer), get(LM.eyeL_inner));
+    const eyeR = mid(get(LM.eyeR_outer), get(LM.eyeR_inner));
+    const eyeL_h = Math.abs(get(LM.eyeL_top).y - get(LM.eyeL_bot).y);
+    const eyeR_h = Math.abs(get(LM.eyeR_top).y - get(LM.eyeR_bot).y);
+    const eyeRadius = Math.max(0.018, (eyeL_h + eyeR_h) * 1.5);
+
+    const mouthC = mid(get(LM.mouth_L), get(LM.mouth_R));
+    const mouthW = Math.abs(get(LM.mouth_R).x - get(LM.mouth_L).x);
+    const mouthH = Math.abs(get(LM.mouth_top).y - get(LM.mouth_bot).y) * 2.2;
+
+    const browL = mid(get(LM.browL_inner), get(LM.browL_outer));
+    const browR = mid(get(LM.browR_inner), get(LM.browR_outer));
+    const browRadius = mouthW * 0.45;
+
+    const center = { x: (faceL.x + faceR.x) / 2, y: (faceTop.y + faceBot.y) / 2 };
+    const size = { x: Math.abs(faceR.x - faceL.x), y: Math.abs(faceBot.y - faceTop.y) };
+
+    currentFace = { center, size, eyeL, eyeR, eyeRadius, mouth: mouthC, mouthSize: { x: mouthW, y: mouthH }, browL, browR, browRadius, chin: get(LM.chin) };
+    document.getElementById('faceLabel').textContent = `face ${Math.round(size.x * 100)}% wide · ${eyeRadius < 0.025 ? 'closed' : 'open'} eyes`;
+  }
+
+  function drawDebug() {
+    if (!debugLandmarks) { dctx.clearRect(0, 0, debugCanvas.width, debugCanvas.height); return; }
+    if (!currentFace) return;
+    const W = window.innerWidth, H = window.innerHeight;
+    debugCanvas.width = W; debugCanvas.height = H;
+    // Compute fit rect on canvas
+    const ar = videoSize[0] / videoSize[1];
+    const canvasAR = W / H;
+    let fitW, fitH;
+    if (canvasAR > ar) { fitH = H * 0.96; fitW = fitH * ar; } else { fitW = W * 0.96; fitH = fitW / ar; }
+    const ox = (W - fitW) / 2, oy = (H - fitH) / 2;
+    const toScreen = (uv) => ({ x: ox + uv.x * fitW, y: oy + uv.y * fitH });
+    dctx.clearRect(0, 0, W, H);
+    dctx.lineWidth = 2;
+    // Eyes
+    dctx.strokeStyle = '#10B981';
+    [currentFace.eyeL, currentFace.eyeR].forEach(e => {
+      const p = toScreen(e);
+      dctx.beginPath();
+      dctx.arc(p.x, p.y, currentFace.eyeRadius * fitW, 0, Math.PI * 2);
+      dctx.stroke();
+    });
+    // Mouth
+    dctx.strokeStyle = '#F59E0B';
+    {
+      const p = toScreen(currentFace.mouth);
+      dctx.strokeRect(
+        p.x - currentFace.mouthSize.x * fitW * 0.6,
+        p.y - currentFace.mouthSize.y * fitH * 0.6,
+        currentFace.mouthSize.x * fitW * 1.2,
+        currentFace.mouthSize.y * fitH * 1.2
+      );
+    }
+    // Brows
+    dctx.strokeStyle = '#EAB308';
+    [currentFace.browL, currentFace.browR].forEach(e => {
+      const p = toScreen(e);
+      dctx.beginPath();
+      dctx.arc(p.x, p.y, currentFace.browRadius * fitW, 0, Math.PI * 2);
+      dctx.stroke();
+    });
+    // Face oval
+    dctx.strokeStyle = 'rgba(245, 237, 220, 0.4)';
+    {
+      const c = toScreen(currentFace.center);
+      dctx.beginPath();
+      dctx.ellipse(c.x, c.y, currentFace.size.x * fitW * 0.55, currentFace.size.y * fitH * 0.55, 0, 0, Math.PI * 2);
+      dctx.stroke();
+    }
+  }
+
+  function resize() {
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    debugCanvas.width = window.innerWidth;
+    debugCanvas.height = window.innerHeight;
+  }
+  let resizeTO;
+  window.addEventListener('resize', () => { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 80); });
+
+  // FPS
+  let fpsCount = 0, fpsT0 = performance.now();
+  function tickFps() {
+    fpsCount++;
+    const now = performance.now();
+    if (now - fpsT0 > 500) {
+      const fps = fpsCount * 1000 / (now - fpsT0);
+      document.getElementById('fpsLabel').textContent = fps.toFixed(0) + ' fps';
+      fpsCount = 0; fpsT0 = now;
+    }
+  }
+
+  function frame() {
+    if (video.readyState >= 2) {
+      uploadVideoTexture();
+      const now = performance.now();
+      // Throttle landmark detection to ~30 Hz
+      if (now - lastDetectTime > 33) {
+        detectFace(now);
+        lastDetectTime = now;
+      }
+      render();
+      drawDebug();
+      tickFps();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function render() {
+    if (!frameTexture) return;
+    const W = canvas.width, H = canvas.height;
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.027, 0.027, 0.039, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, frameTexture);
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_image'), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlas.tex);
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_atlas'), 1);
+
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_imgSize'), videoSize[0], videoSize[1]);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_cellPx'), 6 * dpr);
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_atlasGrid'), atlas.ax, atlas.ay);
+
+    // Ramp offsets
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_brightRampStart'), offsets.bright.start);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_brightRampLen'), offsets.bright.len);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_eyeRampStart'), offsets.eye.start);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_eyeRampLen'), offsets.eye.len);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_mouthRampStart'), offsets.mouth.start);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_mouthRampLen'), offsets.mouth.len);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_browRampStart'), offsets.brow.start);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_browRampLen'), offsets.brow.len);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_skinRampStart'), offsets.skin.start);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_skinRampLen'), offsets.skin.len);
+
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_renderMode'), renderMode);
+
+    if (currentFace) {
+      gl.uniform1f(gl.getUniformLocation(prog, 'u_faceActive'), 1.0);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_faceCenter'), currentFace.center.x, currentFace.center.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_faceSize'), currentFace.size.x, currentFace.size.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_eyeL'), currentFace.eyeL.x, currentFace.eyeL.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_eyeR'), currentFace.eyeR.x, currentFace.eyeR.y);
+      gl.uniform1f(gl.getUniformLocation(prog, 'u_eyeRadius'), currentFace.eyeRadius);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_mouth'), currentFace.mouth.x, currentFace.mouth.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_mouthSize'), currentFace.mouthSize.x, currentFace.mouthSize.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_browL'), currentFace.browL.x, currentFace.browL.y);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_browR'), currentFace.browR.x, currentFace.browR.y);
+      gl.uniform1f(gl.getUniformLocation(prog, 'u_browRadius'), currentFace.browRadius);
+      gl.uniform2f(gl.getUniformLocation(prog, 'u_chin'), currentFace.chin.x, currentFace.chin.y);
+    } else {
+      gl.uniform1f(gl.getUniformLocation(prog, 'u_faceActive'), 0.0);
+    }
+
+    // Update cells label
+    const fitH = (videoSize[0] / videoSize[1]) > (W / H) ? H * 0.96 / dpr : (W * 0.96 / dpr) / (videoSize[0] / videoSize[1]);
+    const cell = 6;
+    const cellH = cell * 1.55;
+    const cols = Math.floor((window.innerWidth * 0.96) / cell);
+    const rows = Math.floor((window.innerHeight * 0.96) / cellH);
+    document.getElementById('cellsLabel').textContent = `${cols}×${rows}`;
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  // ───── Camera startup ─────
+  async function start() {
+    try {
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('startBtn').textContent = 'Cargando MediaPipe…';
+      await initLandmarker();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: 'user' },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await new Promise(r => video.onloadedmetadata = r);
+      await video.play();
+      document.getElementById('overlay').classList.add('hidden');
+      resize();
+      requestAnimationFrame(frame);
+    } catch (e) {
+      document.getElementById('errMsg').textContent = `Error: ${e.message}`;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startBtn').textContent = 'Activar cámara';
+    }
+  }
+  document.getElementById('startBtn').addEventListener('click', start);
+
+  // Controls
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderMode = b.dataset.mode === 'full' ? 0 : 1;
+  }));
+  document.getElementById('mirrorBtn').addEventListener('click', e => {
+    mirror = !mirror;
+    e.target.classList.toggle('active', mirror);
+  });
+  document.getElementById('debugBtn').addEventListener('click', e => {
+    debugLandmarks = !debugLandmarks;
+    e.target.classList.toggle('active', debugLandmarks);
+    debugCanvas.classList.toggle('show', debugLandmarks);
+  });
+})();
+</script>
+
+</body>
+</html>
