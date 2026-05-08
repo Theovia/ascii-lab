@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Specimen — Plate 01 · Eigen Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0E0C09;
+    --bg-2: #16130E;
+    --paper: #E8DBC4;
+    --ink: #F5EDDC;
+    --ink-soft: rgba(245, 237, 220, 0.55);
+    --amber: #D97706;
+    --rust: #B45309;
+    --line: rgba(245, 237, 220, 0.10);
+    --line-2: rgba(245, 237, 220, 0.20);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+  body { cursor: crosshair; }
+  ::selection { background: var(--amber); color: var(--bg); }
+
+  /* ───── Page header (fixed) ───── */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+    padding: 18px 36px;
+    background: rgba(14, 12, 9, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .header .left { justify-self: start; }
+  .header .center { justify-self: center; text-align: center; }
+  .header .right { justify-self: end; display: flex; gap: 22px; }
+  .header .right a { color: var(--ink-soft); text-decoration: none; transition: color .2s; }
+  .header .right a:hover, .header .right a.active { color: var(--ink); }
+  .header b { color: var(--amber); font-weight: 600; }
+
+  /* ───── Main hero ───── */
+  .stage {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+    padding-top: 56px;
+  }
+  canvas#gl {
+    position: absolute;
+    inset: 56px 0 0 0;
+    width: 100%; height: calc(100% - 56px);
+    display: block;
+    z-index: 1;
+  }
+
+  /* Side rails */
+  .rail {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+  .rail.left { left: 36px; top: 50%; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; }
+  .rail.right { right: 36px; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; }
+  .rail b { color: var(--ink); font-weight: 600; }
+
+  /* Plate label (top-left) */
+  .plate-id {
+    position: absolute;
+    top: 84px; left: 36px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .plate-id .num {
+    font-family: 'Newsreader', 'Times New Roman', serif;
+    font-style: italic; font-weight: 500;
+    font-size: 110px; line-height: 0.85;
+    color: var(--paper);
+    letter-spacing: -0.03em;
+  }
+  .plate-id .num span { color: var(--amber); }
+  .plate-id .label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 10px;
+  }
+
+  /* Caption (bottom) */
+  .caption {
+    position: absolute;
+    left: 36px; right: 36px; bottom: 36px;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 48px;
+    pointer-events: none;
+  }
+  .caption .col { display: flex; flex-direction: column; gap: 6px; }
+  .caption .col .key {
+    font-family: 'Geist Mono', monospace;
+    font-size: 9px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .caption .col .val {
+    font-family: 'Newsreader', 'Times New Roman', serif;
+    font-size: 16px; font-weight: 400;
+    color: var(--ink);
+  }
+  .caption .col .val em { font-style: italic; color: var(--paper); }
+  .caption .col .meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px; letter-spacing: 0.14em;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  /* Drop button */
+  .drop {
+    position: absolute;
+    top: 84px; right: 36px;
+    z-index: 12;
+    background: rgba(20, 17, 13, 0.78);
+    border: 1px solid var(--line-2);
+    border-radius: 2px;
+    padding: 8px 14px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .drop:hover { border-color: var(--amber); color: var(--ink); }
+  .drop input { display: none; }
+
+  /* ───── Below-fold: technique sheet ───── */
+  .sheet {
+    padding: 120px 36px 80px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .sheet h2 {
+    font-family: 'Newsreader', 'Times New Roman', serif;
+    font-style: italic; font-weight: 500;
+    font-size: clamp(40px, 5vw, 72px);
+    letter-spacing: -0.02em;
+    line-height: 1.0;
+    margin-bottom: 56px;
+    color: var(--paper);
+    max-width: 880px;
+  }
+  .sheet h2 b { color: var(--amber); font-weight: 500; font-style: italic; }
+
+  .sheet-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 80px;
+    border-top: 1px solid var(--line);
+    padding-top: 32px;
+  }
+  @media (max-width: 800px) { .sheet-grid { grid-template-columns: 1fr; gap: 24px; } }
+  .sheet-grid .key {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .sheet-grid .val {
+    font-family: 'Newsreader', serif;
+    font-size: 16px; line-height: 1.55;
+    color: var(--ink);
+  }
+  .sheet-grid .val em { font-style: italic; color: var(--amber); }
+  .sheet-grid .row {
+    display: contents;
+  }
+  .sheet-grid .row > * {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .specimen-list {
+    margin-top: 100px;
+  }
+  .specimen-list .head {
+    font-family: 'Newsreader', serif;
+    font-style: italic; font-weight: 500;
+    font-size: 32px;
+    color: var(--paper);
+    margin-bottom: 24px;
+  }
+  .specimen-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 1fr 80px;
+    gap: 24px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    color: var(--ink);
+    align-items: center;
+    transition: background .2s ease;
+  }
+  .specimen-row:hover { background: rgba(245, 237, 220, 0.04); }
+  .specimen-row.coming { opacity: 0.45; pointer-events: none; }
+  .specimen-row .num { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; color: var(--ink-soft); }
+  .specimen-row .title { font-family: 'Newsreader', serif; font-size: 20px; font-style: italic; }
+  .specimen-row .author { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+  .specimen-row .arrow { text-align: right; color: var(--amber); font-family: 'Geist Mono', monospace; }
+
+  .footer {
+    border-top: 1px solid var(--line);
+    padding: 36px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line-2); padding-bottom: 2px; }
+  .footer a:hover { border-color: var(--amber); }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.3,1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  .err { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--ink); font-family: 'Geist Mono', monospace; font-size: 13px; padding: 32px; z-index: 999; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="left">EIGEN ATLAS · <b>SPECIMEN</b></div>
+  <div class="center">PLATE 01 · 17/05/2026 · Mauritshuis Collection</div>
+  <div class="right">
+    <a href="#" class="active">Specimen</a>
+    <a href="#technique">Technique</a>
+    <a href="#index">Index</a>
+    <a href="https://eigenatlas.com">← Atlas</a>
+  </div>
+</header>
+
+<section class="stage">
+  <canvas id="gl"></canvas>
+
+  <div class="rail left">
+    <b>VERMEER</b> · 17C · OIL ON CANVAS · 44.5 × 39 CM
+  </div>
+  <div class="rail right">
+    METHOD · WEBGL2 · SOBEL EDGE · <b>HOVER TO REVEAL</b>
+  </div>
+
+  <label class="drop">
+    Replace specimen
+    <input type="file" id="file" accept="image/*" />
+  </label>
+
+  <div class="plate-id">
+    <div class="num">01<span>.</span></div>
+    <div class="label">— Plate · vol. I</div>
+  </div>
+
+  <div class="caption">
+    <div class="col">
+      <span class="key">Specimen</span>
+      <span class="val"><em id="title">Girl with a Pearl Earring</em></span>
+      <span class="meta" id="author">Johannes Vermeer · c. 1665</span>
+    </div>
+    <div class="col">
+      <span class="key">Method</span>
+      <span class="val">Brightness ramp · 42 glyphs</span>
+      <span class="meta">Cursor reveals Sobel edge plate</span>
+    </div>
+    <div class="col">
+      <span class="key">Render</span>
+      <span class="val">WebGL2 · 4-px cell</span>
+      <span class="meta" id="cellInfo">— cells · 60 fps</span>
+    </div>
+  </div>
+</section>
+
+<section class="sheet reveal" id="technique">
+  <h2>The cursor passes <b>through</b> the painting<br/>like an X-ray plate.</h2>
+
+  <div class="sheet-grid">
+    <div class="row">
+      <div class="key">Outside cursor</div>
+      <div class="val">The painting is rendered at full color and brightness — each cell takes the color of the underlying pixel and a glyph chosen by luminance from a forty-two-step ramp.</div>
+    </div>
+    <div class="row">
+      <div class="key">Inside cursor</div>
+      <div class="val">A Sobel filter samples four neighbors per cell. The gradient direction is quantized into four bins and the corresponding stroke — <em>/ \ | _</em> — replaces the brightness glyph. The painting <em>becomes line</em>.</div>
+    </div>
+    <div class="row">
+      <div class="key">Color</div>
+      <div class="val">Outside: <em>polychrome</em>, sampling the original palette. Inside: <em>monochrome paper</em>, like a study sketch under raking light.</div>
+    </div>
+    <div class="row">
+      <div class="key">Movement</div>
+      <div class="val">No deformation. The image holds. Only the <em>disposition of the glyphs</em> changes — character substitution, not pixel pushing.</div>
+    </div>
+    <div class="row">
+      <div class="key">Atlas</div>
+      <div class="val">A 46-glyph monospaced font atlas, pre-rasterized once and uploaded as an 8×6 GPU texture. Brightness ramp: 42 chars. Edge ramp: 4 chars (<em>/ \ | _</em>) at fixed indices.</div>
+    </div>
+    <div class="row">
+      <div class="key">Performance</div>
+      <div class="val">Single-pass fragment shader. Five texture samples per fragment (one main + four Sobel neighbors). Clamped to two-pixel device-pixel-ratio. Sixty hertz at 4K.</div>
+    </div>
+  </div>
+
+  <div class="specimen-list" id="index">
+    <div class="head">Other specimens — vol. I</div>
+    <a class="specimen-row" href="atelier.html">
+      <div class="num">— ATELIER</div>
+      <div class="title">Head-tilt parallax study</div>
+      <div class="author">Vermeer · brightness boost</div>
+      <div class="arrow">→</div>
+    </a>
+    <a class="specimen-row coming" href="#">
+      <div class="num">02 · soon</div>
+      <div class="title">Narcissus</div>
+      <div class="author">Caravaggio · c. 1597</div>
+      <div class="arrow">○</div>
+    </a>
+    <a class="specimen-row coming" href="#">
+      <div class="num">03 · soon</div>
+      <div class="title">Magdalene with the Smoking Flame</div>
+      <div class="author">Georges de La Tour · c. 1640</div>
+      <div class="arrow">○</div>
+    </a>
+    <a class="specimen-row coming" href="#">
+      <div class="num">04 · soon</div>
+      <div class="title">Self-portrait at the Age of 63</div>
+      <div class="author">Rembrandt · 1669</div>
+      <div class="arrow">○</div>
+    </a>
+  </div>
+</section>
+
+<footer class="footer">
+  <span>Eigen Atlas · 2026 · <a href="https://eigenatlas.com">eigenatlas.com</a></span>
+  <span>Specimen volume I · plate 01</span>
+</footer>
+
+<!-- Vertex shader -->
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+</script>
+
+<!-- Fragment shader: TRUE-COLOR ASCII. Cursor PULLS chars toward it + head-tilt looks at cursor -->
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+
+uniform sampler2D u_image;
+uniform sampler2D u_atlas;
+uniform vec2 u_resolution;
+uniform vec2 u_imgSize;
+uniform float u_cellPx;
+uniform vec2 u_atlasGrid;
+uniform float u_charCount;
+uniform vec2 u_mouseUV;
+uniform float u_mouseActive;
+uniform float u_tiltAngle;
+uniform float u_tiltShift;
+
+const vec3 BG = vec3(0.055, 0.047, 0.035);
+
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+void main() {
+  vec2 fragPx = v_uv * u_resolution;
+
+  // ───── Cell layout: FIXED grid in screen space, no per-fragment distortion ─────
+  float canvasAR = u_resolution.x / u_resolution.y;
+  float imgAR = u_imgSize.x / u_imgSize.y;
+  float marginScale = 0.94;
+  float fitH, fitW;
+  if (canvasAR > imgAR) { fitH = u_resolution.y * marginScale; fitW = fitH * imgAR; }
+  else                   { fitW = u_resolution.x * marginScale; fitH = fitW / imgAR; }
+  vec2 fitOrigin = (u_resolution - vec2(fitW, fitH)) * 0.5;
+
+  float cellW = u_cellPx;
+  float cellH = u_cellPx * 1.55;
+  vec2 cellSize = vec2(cellW, cellH);
+  vec2 inFit = fragPx - fitOrigin;
+  vec2 cellId = floor(inFit / cellSize);
+  vec2 cellOrigin = cellId * cellSize;
+  vec2 cellLocal = (inFit - cellOrigin) / cellSize;
+  vec2 cellCenterPx = fitOrigin + cellOrigin + cellSize * 0.5;
+  vec2 cellCenterUV = (cellCenterPx - fitOrigin) / vec2(fitW, fitH);
+
+  // ───── Cursor effect: ALL goes into image lookup transform ─────
+  // Image rotates around eye-level pivot + shifts toward cursor + slight scale
+  // = figure turns to look at cursor. NO per-fragment distortion = no blob.
+  vec2 mOff = (u_mouseUV - 0.5) * u_mouseActive;
+  float angle = mOff.x * u_tiltAngle;        // flipped: cursor right → figure rotates right
+  float c = cos(angle), s = sin(angle);
+  mat2 rot = mat2(c, -s, s, c);
+
+  vec2 pivot = vec2(0.5, 0.40);
+  vec2 lookupUV = cellCenterUV - pivot;
+  lookupUV = rot * lookupUV;
+  lookupUV += pivot;
+  lookupUV -= mOff * u_tiltShift;            // flipped: cursor right → image shifts right
+
+  if (lookupUV.x < 0.0 || lookupUV.x > 1.0 || lookupUV.y < 0.0 || lookupUV.y > 1.0) {
+    outColor = vec4(BG, 1.0);
+    return;
+  }
+
+  vec4 src = texture(u_image, lookupUV);
+  float l = lum(src.rgb);
+  l = (l - 0.5) * 1.10 + 0.5;
+  l = clamp(l, 0.0, 1.0);
+
+  if (l < 0.04) { outColor = vec4(BG, 1.0); return; }
+
+  // ───── 4. Char index: brightness ramp ONLY (no cursor influence on chars/color) ─────
+  float charIdx = floor(l * (u_charCount - 0.0001));
+  charIdx = clamp(charIdx, 0.0, u_charCount - 1.0);
+
+  float ax = u_atlasGrid.x;
+  float ay = u_atlasGrid.y;
+  float col = mod(charIdx, ax);
+  float row = floor(charIdx / ax);
+  vec2 atlasCell = vec2(col, row);
+  vec2 atlasUV = (atlasCell + vec2(cellLocal.x, 1.0 - cellLocal.y)) / vec2(ax, ay);
+  atlasUV.x = clamp(atlasUV.x, atlasCell.x / ax + 0.001, (atlasCell.x + 1.0) / ax - 0.001);
+  atlasUV.y = clamp(atlasUV.y, atlasCell.y / ay + 0.001, (atlasCell.y + 1.0) / ay - 0.001);
+  float glyph = texture(u_atlas, atlasUV).r;
+  glyph = smoothstep(0.4, 0.6, glyph);
+
+  // ───── 5. TRUE RGB color, no cursor change ─────
+  vec3 color = src.rgb;
+  float baseLum = max(0.01, dot(color, vec3(0.333)));
+  float targetLum = 0.30 + l * 0.65;
+  float k = clamp(targetLum / baseLum, 0.4, 2.4);
+  color = clamp(color * k, 0.0, 1.0);
+  vec3 grey = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
+  color = mix(grey, color, 1.20);
+  vec3 charColor = clamp(color, 0.0, 1.0);
+
+  vec3 finalColor = mix(BG, charColor, glyph);
+
+  outColor = vec4(finalColor, 1.0);
+}
+</script>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gl');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false });
+  if (!gl) {
+    document.body.insertAdjacentHTML('afterbegin', '<div class="err">WebGL2 not available</div>');
+    return;
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  const RAMP = ' .\'`,:;!iI?ltjf1234567890[]{}|()*#$@%MW&8B';
+
+  function compile(t, s) {
+    const sh = gl.createShader(t);
+    gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  }
+  function link(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  const vs = compile(gl.VERTEX_SHADER, document.getElementById('vs').textContent.trim());
+  const fs = compile(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent.trim());
+  const prog = link(vs, fs);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(prog, 'a_pos');
+
+  function buildAtlas() {
+    const cellPx = 64, cellH = Math.round(cellPx * 1.55);
+    const ax = 8, ay = Math.ceil(RAMP.length / ax);
+    const c = document.createElement('canvas');
+    c.width = ax * cellPx; c.height = ay * cellH;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, c.width, c.height);
+    cx.font = `600 ${Math.round(cellPx * 1.05)}px 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#fff';
+    for (let i = 0; i < RAMP.length; i++) {
+      const col = i % ax, row = Math.floor(i / ax);
+      cx.fillText(RAMP[i], col * cellPx + cellPx / 2, row * cellH + cellH / 2);
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    return { tex, ax, ay };
+  }
+  const atlas = buildAtlas();
+
+  let imgTex = null, imgSize = [600, 700];
+  function loadImage(src) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (imgTex) gl.deleteTexture(imgTex);
+      imgTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, imgTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      imgSize = [img.naturalWidth || 600, img.naturalHeight || 700];
+      updateCellInfo();
+    };
+    img.onerror = () => { img.onerror = null; img.src = FALLBACK_URL; };
+    img.src = src;
+  }
+
+  function updateCellInfo() {
+    const stage = document.querySelector('.stage');
+    const w = stage.clientWidth, h = stage.clientHeight - 56;
+    const ar = imgSize[0] / imgSize[1];
+    let fitH = h * 0.94, fitW = fitH * ar;
+    if (fitW > w * 0.94) { fitW = w * 0.94; fitH = fitW / ar; }
+    const cw = 4, chh = 4 * 1.55;
+    const cols = Math.floor(fitW / cw);
+    const rows = Math.floor(fitH / chh);
+    const el = document.getElementById('cellInfo');
+    if (el) el.textContent = `${cols.toLocaleString()} × ${rows.toLocaleString()} cells · 60 fps`;
+  }
+
+  function resize() {
+    const stage = document.querySelector('.stage');
+    canvas.width = Math.floor(stage.clientWidth * dpr);
+    canvas.height = Math.floor((stage.clientHeight - 56) * dpr);
+    updateCellInfo();
+  }
+
+  // Mouse — relative to canvas (which is the stage minus header)
+  const mouse = { x: -1, y: -1, active: false };
+  const ms = { x: 0.5, y: 0.5, active: 0 };
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) / rect.width;
+    mouse.y = (e.clientY - rect.top) / rect.height;
+    mouse.active = true;
+  });
+  canvas.addEventListener('mouseleave', () => { mouse.active = false; });
+
+  function frame() {
+    if (mouse.active) {
+      ms.x += (mouse.x - ms.x) * 0.15;
+      ms.y += (mouse.y - ms.y) * 0.15;
+      ms.active += (1 - ms.active) * 0.08;
+    } else {
+      ms.x += (0.5 - ms.x) * 0.05;
+      ms.y += (0.5 - ms.y) * 0.05;
+      ms.active += (0 - ms.active) * 0.06;
+    }
+    if (!imgTex) { requestAnimationFrame(frame); return; }
+    const W = canvas.width, H = canvas.height;
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.055, 0.047, 0.035, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, imgTex);
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_image'), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlas.tex);
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_atlas'), 1);
+
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_imgSize'), imgSize[0], imgSize[1]);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_cellPx'), 4 * dpr);
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_atlasGrid'), atlas.ax, atlas.ay);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_charCount'), RAMP.length);
+
+    // Mouse UV with Y flipped to match WebGL bottom-left frame
+    gl.uniform2f(gl.getUniformLocation(prog, 'u_mouseUV'), ms.x, 1.0 - ms.y);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_mouseActive'), ms.active);
+
+    // Image rotates + shifts toward cursor (looks at viewer). No per-cell blob.
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_tiltAngle'), 0.10);   // ~5.7° max
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_tiltShift'), 0.04);   // 4% UV shift
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(frame);
+  }
+
+  const VERMEER_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/1665_Girl_with_a_Pearl_Earring.jpg/1024px-1665_Girl_with_a_Pearl_Earring.jpg';
+
+  const FALLBACK_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 700'>
+    <defs>
+      <radialGradient id='face' cx='50%' cy='38%' r='40%'>
+        <stop offset='0%' stop-color='#f5e6d3'/>
+        <stop offset='40%' stop-color='#c9a987'/>
+        <stop offset='80%' stop-color='#3a2614'/>
+        <stop offset='100%' stop-color='#0a0608'/>
+      </radialGradient>
+      <radialGradient id='turban' cx='40%' cy='25%' r='55%'>
+        <stop offset='0%' stop-color='#dfd5e8'/>
+        <stop offset='60%' stop-color='#5a4a8a'/>
+        <stop offset='100%' stop-color='#1a1430'/>
+      </radialGradient>
+    </defs>
+    <rect width='600' height='700' fill='#0a0608'/>
+    <ellipse cx='300' cy='280' rx='160' ry='200' fill='url(#turban)'/>
+    <ellipse cx='300' cy='320' rx='115' ry='150' fill='url(#face)'/>
+    <ellipse cx='270' cy='310' rx='12' ry='8' fill='#1a0e08'/>
+    <ellipse cx='335' cy='312' rx='12' ry='8' fill='#1a0e08'/>
+    <ellipse cx='300' cy='378' rx='18' ry='6' fill='#5a2818'/>
+    <circle cx='378' cy='350' r='8' fill='#fff' opacity='0.85'/>
+    <path d='M 200 460 Q 300 540 400 460 L 420 700 L 180 700 Z' fill='#0a0608'/>
+  </svg>`;
+  const FALLBACK_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(FALLBACK_SVG);
+
+  let resizeTO;
+  window.addEventListener('resize', () => { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 80); });
+  resize();
+  loadImage(VERMEER_URL);
+  requestAnimationFrame(frame);
+
+  document.getElementById('file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    loadImage(URL.createObjectURL(f));
+    document.getElementById('title').textContent = f.name.replace(/\.[^.]+$/, '');
+    document.getElementById('author').textContent = 'Uploaded · ' + new Date().toLocaleDateString();
+  });
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+})();
+</script>
+
+</body>
+</html>

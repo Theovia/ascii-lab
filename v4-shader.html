@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>v4 — WebGL2 Shader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #060608; --fg: #38bdf8; --line: rgba(255,255,255,0.16); --soft: rgba(255,255,255,0.4); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; font-family: 'Inter', system-ui, sans-serif; color: #fff; }
+  body { cursor: crosshair; }
+  canvas#gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .badge { position: fixed; top: 24px; right: 24px; background: var(--fg); color: #060608; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; padding: 11px 18px; border-radius: 2px; text-decoration: none; z-index: 10; }
+  .brand { position: fixed; top: 24px; left: 24px; z-index: 10; font-size: 13px; letter-spacing: 0.04em; color: rgba(255,255,255,0.85); }
+  .brand b { color: var(--fg); font-weight: 600; }
+  .brand small { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); margin-top: 4px; }
+  .meta { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--soft); text-align: center; line-height: 1.7; }
+  .meta b { color: var(--fg); font-weight: 600; }
+  .home { position: fixed; top: 24px; left: 240px; z-index: 10; color: var(--soft); text-decoration: none; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px; }
+  .home:hover { color: #fff; border-color: var(--fg); }
+
+  .panel { position: fixed; left: 24px; right: 24px; bottom: 24px; z-index: 10; display: flex; gap: 14px; align-items: stretch; padding: 14px 18px; background: rgba(15, 15, 18, 0.78); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid var(--line); border-radius: 4px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
+  .panel .group { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 0 0 auto; }
+  .panel .group.flex { flex: 1 1 auto; min-width: 130px; }
+  .panel .group .label { color: rgba(255,255,255,0.4); }
+  .panel .group .value { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .panel .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel button, .panel label.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 2px; cursor: pointer; background: transparent; color: rgba(255,255,255,0.85); font-family: inherit; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: border-color .2s, color .2s, background .2s; white-space: nowrap; }
+  .panel button:hover, .panel label.btn:hover { border-color: var(--fg); color: #fff; }
+  .panel button.active { background: var(--fg); color: #060608; border-color: var(--fg); }
+  .panel input[type="file"] { display: none; }
+  .panel input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: ew-resize; margin: 0; }
+  .panel input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line); border-radius: 1px; }
+  .panel input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; margin-top: -4px; background: var(--fg); border-radius: 50%; border: 2px solid #060608; transition: transform .15s; }
+  .err { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.5; color: #ff4d6d; padding: 32px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <div class="brand">
+    Raul Chio · <b>ASCII Lab</b>
+    <small>v4 · WebGL2 Shader</small>
+  </div>
+  <a class="home" href="index.html">← lab</a>
+
+  <div class="meta">
+    <b id="cellInfo">—</b><br />
+    GLSL fragment shader · sub-pixel cells · 4K-ready
+  </div>
+
+  <a class="badge" href="#">v4 / shader</a>
+
+  <div class="panel">
+    <div class="group">
+      <span class="label">Source</span>
+      <label class="btn" for="file">Drop image</label>
+      <input type="file" id="file" accept="image/*" />
+    </div>
+    <div class="group flex">
+      <div class="row"><span class="label">Cell</span><span class="value" id="cellVal">5px</span></div>
+      <input type="range" id="cellSize" min="2" max="20" step="1" value="5" />
+    </div>
+    <div class="group flex">
+      <div class="row"><span class="label">Contrast</span><span class="value" id="contrastVal">1.00</span></div>
+      <input type="range" id="contrast" min="40" max="220" step="2" value="100" />
+    </div>
+    <div class="group flex">
+      <div class="row"><span class="label">Bloom</span><span class="value" id="bloomVal">0.40</span></div>
+      <input type="range" id="bloom" min="0" max="100" step="2" value="40" />
+    </div>
+    <div class="group flex">
+      <div class="row"><span class="label">CRT</span><span class="value" id="crtVal">0.50</span></div>
+      <input type="range" id="crt" min="0" max="100" step="2" value="50" />
+    </div>
+    <div class="group">
+      <span class="label">Color</span>
+      <div class="row">
+        <button data-mode="0" class="active">Amber</button>
+        <button data-mode="1">True</button>
+        <button data-mode="2">Mono</button>
+        <button data-mode="3">Cyan</button>
+        <button data-mode="4">Magenta</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="label">Action</span>
+      <div class="row">
+        <button id="invertBtn">Invert</button>
+        <button id="exportBtn">PNG</button>
+      </div>
+    </div>
+  </div>
+
+<!-- Vertex shader -->
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+</script>
+
+<!-- Pass 1: ASCII render -->
+<script id="fs_ascii" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+
+in vec2 v_uv;
+out vec4 outColor;
+
+uniform sampler2D u_image;
+uniform sampler2D u_atlas;
+uniform vec2 u_resolution;        // canvas px
+uniform vec2 u_imgSize;           // image px (natural)
+uniform float u_cellPx;           // cell width in screen px
+uniform vec2 u_atlasGrid;         // atlas glyphs (cols, rows)
+uniform float u_charCount;
+uniform vec2 u_mouse;
+uniform float u_radius;
+uniform float u_pushMax;
+uniform int u_colorMode;
+uniform float u_invert;
+uniform float u_contrast;
+uniform float u_brightness;
+uniform float u_time;
+
+const float CELL_AR = 1.55;       // height/width of a mono char cell
+
+vec3 hslToRgb(float h, float s, float l) {
+  h = mod(h / 360.0, 1.0);
+  float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+  float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+  float m = l - c * 0.5;
+  vec3 rgb;
+       if (h < 1.0/6.0) rgb = vec3(c, x, 0.0);
+  else if (h < 2.0/6.0) rgb = vec3(x, c, 0.0);
+  else if (h < 3.0/6.0) rgb = vec3(0.0, c, x);
+  else if (h < 4.0/6.0) rgb = vec3(0.0, x, c);
+  else if (h < 5.0/6.0) rgb = vec3(x, 0.0, c);
+  else                  rgb = vec3(c, 0.0, x);
+  return rgb + m;
+}
+
+void main() {
+  vec2 fragPx = v_uv * u_resolution;
+
+  // Cursor displacement field in pixel space
+  vec2 toM = fragPx - u_mouse;
+  float distM = length(toM);
+  float fInf = 1.0 - clamp(distM / u_radius, 0.0, 1.0);
+  fInf = smoothstep(0.0, 1.0, fInf);
+  vec2 dir = distM > 0.5 ? toM / distM : vec2(0.0);
+  vec2 pushPx = dir * fInf * u_pushMax;
+
+  vec2 distortedPx = fragPx + pushPx;
+
+  // Letterbox image (object-fit: contain)
+  float canvasAR = u_resolution.x / u_resolution.y;
+  float imgAR = u_imgSize.x / u_imgSize.y;
+  // Compute the rect (in canvas px) where image sits, leaving 4% margin
+  float marginScale = 0.94;
+  float fitH, fitW;
+  if (canvasAR > imgAR) { fitH = u_resolution.y * marginScale; fitW = fitH * imgAR; }
+  else                   { fitW = u_resolution.x * marginScale; fitH = fitW / imgAR; }
+  vec2 fitOrigin = (u_resolution - vec2(fitW, fitH)) * 0.5;
+  vec2 imgPx = distortedPx - fitOrigin;
+  vec2 imgUV = imgPx / vec2(fitW, fitH);
+
+  // Cell grid is aligned to fitOrigin so cells stay inside image rect
+  // cellW px wide, cellW * CELL_AR tall
+  float cellW = u_cellPx;
+  float cellH = u_cellPx * CELL_AR;
+  vec2 cellSize = vec2(cellW, cellH);
+  vec2 inFit = distortedPx - fitOrigin;
+  vec2 cellId = floor(inFit / cellSize);
+  vec2 cellOrigin = cellId * cellSize;
+  vec2 cellLocal = (inFit - cellOrigin) / cellSize;   // [0,1]
+  vec2 cellCenterPx = fitOrigin + cellOrigin + cellSize * 0.5;
+  vec2 cellCenterUV = (cellCenterPx - fitOrigin) / vec2(fitW, fitH);
+
+  // Outside image rect → solid bg
+  if (cellCenterUV.x < 0.0 || cellCenterUV.x > 1.0 || cellCenterUV.y < 0.0 || cellCenterUV.y > 1.0) {
+    outColor = vec4(0.022, 0.022, 0.030, 1.0);
+    return;
+  }
+
+  // Sample image at cell center
+  vec4 src = texture(u_image, cellCenterUV);
+  float lum = dot(src.rgb, vec3(0.299, 0.587, 0.114));
+  lum = (lum - 0.5) * u_contrast + 0.5 + u_brightness;
+  if (u_invert > 0.5) lum = 1.0 - lum;
+
+  // Cursor brightness boost (use undistorted cellCenter for stable boost)
+  vec2 cellCenterScreen = cellCenterPx;
+  float cellDist = length(cellCenterScreen - u_mouse);
+  float boost = smoothstep(u_radius, 0.0, cellDist) * 0.55;
+  lum = clamp(lum + boost, 0.0, 1.0);
+
+  // Char index from luminance
+  float charIdx = floor(lum * (u_charCount - 0.0001));
+  charIdx = clamp(charIdx, 0.0, u_charCount - 1.0);
+
+  // Atlas position
+  float ax = u_atlasGrid.x;
+  float ay = u_atlasGrid.y;
+  float col = mod(charIdx, ax);
+  float row = floor(charIdx / ax);
+  vec2 atlasCell = vec2(col, row);
+  // Flip Y: atlas drawn top-down, but textures sampled bottom-up
+  vec2 atlasUV = (atlasCell + vec2(cellLocal.x, 1.0 - cellLocal.y)) / vec2(ax, ay);
+  float glyph = texture(u_atlas, atlasUV).r;
+
+  // Anti-alias glyph edges
+  glyph = smoothstep(0.4, 0.6, glyph);
+
+  // Color
+  vec3 color = vec3(0.0);
+  float boostHue = boost * 22.0;
+  if (u_colorMode == 0) {           // amber
+    color = hslToRgb(28.0 + boostHue, 0.88, 0.22 + lum * 0.55);
+  } else if (u_colorMode == 1) {    // true
+    float baseLum = max(0.01, dot(src.rgb, vec3(0.333)));
+    float k = (lum * 0.85 + 0.15) / baseLum;
+    color = clamp(src.rgb * k, 0.0, 1.0);
+  } else if (u_colorMode == 2) {    // mono
+    color = vec3(0.10 + lum * 0.85);
+  } else if (u_colorMode == 3) {    // cyan
+    color = hslToRgb(190.0 + boostHue, 0.78, 0.25 + lum * 0.55);
+  } else {                          // magenta
+    color = hslToRgb(320.0 + boostHue, 0.80, 0.25 + lum * 0.55);
+  }
+
+  outColor = vec4(color * glyph, glyph);
+}
+</script>
+
+<!-- Pass 2: post-FX (bloom + chromatic aberration + scanlines) -->
+<script id="fs_post" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+uniform sampler2D u_scene;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_bloom;
+uniform float u_crt;
+uniform float u_time;
+
+vec3 sampleBloom(vec2 uv) {
+  vec3 acc = vec3(0.0);
+  float total = 0.0;
+  // 9-tap Gaussian-ish blur (sample horizontal+vertical+diag offsets)
+  vec2 px = 1.0 / u_resolution;
+  vec2 offs[9];
+  offs[0] = vec2(-2,-2); offs[1] = vec2(0,-2); offs[2] = vec2(2,-2);
+  offs[3] = vec2(-2, 0); offs[4] = vec2(0, 0); offs[5] = vec2(2, 0);
+  offs[6] = vec2(-2, 2); offs[7] = vec2(0, 2); offs[8] = vec2(2, 2);
+  float w[9];
+  w[0]=1.0; w[1]=2.0; w[2]=1.0;
+  w[3]=2.0; w[4]=4.0; w[5]=2.0;
+  w[6]=1.0; w[7]=2.0; w[8]=1.0;
+  for (int i = 0; i < 9; i++) {
+    vec3 c = texture(u_scene, uv + offs[i] * px * 3.0).rgb;
+    // Threshold bright pixels for bloom
+    float l = dot(c, vec3(0.299, 0.587, 0.114));
+    c *= smoothstep(0.4, 1.0, l);
+    acc += c * w[i];
+    total += w[i];
+  }
+  return acc / total;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  // Chromatic aberration centered on cursor
+  vec2 mouseUV = u_mouse / u_resolution;
+  vec2 toMouse = uv - mouseUV;
+  float dM = length(toMouse * vec2(u_resolution.x / u_resolution.y, 1.0));
+  float aberration = smoothstep(0.0, 0.25, dM) * 0.004;
+  vec2 dir = dM > 0.001 ? normalize(toMouse) : vec2(0.0);
+
+  vec3 base;
+  base.r = texture(u_scene, uv + dir * aberration).r;
+  base.g = texture(u_scene, uv).g;
+  base.b = texture(u_scene, uv - dir * aberration).b;
+
+  // Bloom
+  vec3 bloomCol = sampleBloom(uv);
+  base += bloomCol * u_bloom;
+
+  // Scanlines
+  float scan = 1.0 - u_crt * 0.18 * (sin(uv.y * u_resolution.y * 3.14159) * 0.5 + 0.5);
+  base *= scan;
+
+  // Subtle vignette
+  vec2 vig = uv - 0.5;
+  float vigStr = 1.0 - dot(vig, vig) * 0.6;
+  base *= vigStr;
+
+  outColor = vec4(base, 1.0);
+}
+</script>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gl');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false });
+  if (!gl) {
+    document.body.innerHTML = '<div class="err">WebGL2 not available in this browser.</div>';
+    return;
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  const RAMP = ' .\'`,:;!iI?ltjf1234567890[]{}|()*#$@%MW&8B';
+
+  let CELL = 5;
+  let colorMode = 0;
+  let invert = 0;
+  let contrast = 1.0;
+  let brightDelta = 0.0;
+  let bloomAmount = 0.40;
+  let crtAmount = 0.50;
+  let imgTex = null;
+  let imgSize = [600, 850];
+  let radius = 220;
+  let pushMax = 26;
+
+  const mouse = { x: -9999, y: -9999, lx: -9999, ly: -9999 };
+  const ms = { x: -9999, y: -9999, intensity: 0 };
+
+  // ───── Compile shader ─────
+  function compile(type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(sh);
+      console.error('Shader compile error:', log);
+      throw new Error('Shader compile: ' + log);
+    }
+    return sh;
+  }
+  function link(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      throw new Error('Link: ' + gl.getProgramInfoLog(p));
+    }
+    return p;
+  }
+
+  const vsSrc = document.getElementById('vs').textContent.trim();
+  const fsAsciiSrc = document.getElementById('fs_ascii').textContent.trim();
+  const fsPostSrc = document.getElementById('fs_post').textContent.trim();
+
+  let progAscii, progPost;
+  try {
+    const vs = compile(gl.VERTEX_SHADER, vsSrc);
+    const fsA = compile(gl.FRAGMENT_SHADER, fsAsciiSrc);
+    const fsP = compile(gl.FRAGMENT_SHADER, fsPostSrc);
+    progAscii = link(vs, fsA);
+    progPost = link(vs, fsP);
+  } catch (e) {
+    document.body.innerHTML = `<div class="err">${e.message}</div>`;
+    return;
+  }
+
+  // ───── Geometry: full-screen quad ─────
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1,
+  ]), gl.STATIC_DRAW);
+
+  function bindQuad(prog) {
+    const loc = gl.getAttribLocation(prog, 'a_pos');
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  // ───── Glyph atlas: render RAMP chars to a 2D canvas, upload as texture ─────
+  function buildAtlas() {
+    const cellPx = 64;
+    const cellH = Math.round(cellPx * 1.55);
+    const ax = 8;
+    const ay = Math.ceil(RAMP.length / ax);
+    const w = ax * cellPx;
+    const h = ay * cellH;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#000';
+    cx.fillRect(0, 0, w, h);
+    cx.font = `600 ${Math.round(cellPx * 1.05)}px 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace`;
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    cx.fillStyle = '#fff';
+    for (let i = 0; i < RAMP.length; i++) {
+      const col = i % ax;
+      const row = Math.floor(i / ax);
+      const x = col * cellPx + cellPx / 2;
+      const y = row * cellH + cellH / 2;
+      cx.fillText(RAMP[i], x, y);
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    return { tex, ax, ay, cellPx, cellH };
+  }
+  const atlas = buildAtlas();
+
+  // ───── Source image texture ─────
+  function loadImage(src) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (imgTex) gl.deleteTexture(imgTex);
+      imgTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, imgTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      imgSize = [img.naturalWidth || 600, img.naturalHeight || 850];
+      updateCellInfo();
+    };
+    img.src = src;
+  }
+
+  // ───── FBO for two-pass ─────
+  let fbo = null, fboTex = null, fboW = 0, fboH = 0;
+  function ensureFBO(w, h) {
+    if (fboW === w && fboH === h && fbo) return;
+    if (fbo) { gl.deleteFramebuffer(fbo); gl.deleteTexture(fboTex); }
+    fbo = gl.createFramebuffer();
+    fboTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+    fboW = w; fboH = h;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ensureFBO(canvas.width, canvas.height);
+    updateCellInfo();
+  }
+
+  function updateCellInfo() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const ar = imgSize[0] / imgSize[1];
+    let fitH = h * 0.94, fitW = fitH * ar;
+    if (fitW > w * 0.94) { fitW = w * 0.94; fitH = fitW / ar; }
+    const cw = CELL, chh = CELL * 1.55;
+    const cols = Math.floor(fitW / cw);
+    const rows = Math.floor(fitH / chh);
+    document.getElementById('cellInfo').textContent =
+      `${cols.toLocaleString()} × ${rows.toLocaleString()} cells · ${(cols * rows).toLocaleString()} glyphs`;
+  }
+
+  // ───── Render ─────
+  function frame() {
+    ms.x += (mouse.x - ms.x) * 0.22;
+    ms.y += (mouse.y - ms.y) * 0.22;
+    const speed = Math.hypot(mouse.x - mouse.lx, mouse.y - mouse.ly);
+    mouse.lx = mouse.x; mouse.ly = mouse.y;
+    ms.intensity += (Math.min(speed, 80) / 80 - ms.intensity) * 0.08;
+
+    if (!imgTex) { requestAnimationFrame(frame); return; }
+
+    const W = canvas.width, H = canvas.height;
+    const mouseGL = [ms.x * dpr, (window.innerHeight - ms.y) * dpr];
+
+    // ───── Pass 1: render ASCII to FBO ─────
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.022, 0.022, 0.030, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(progAscii);
+    bindQuad(progAscii);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, imgTex);
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_image'), 0);
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, atlas.tex);
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_atlas'), 1);
+
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_imgSize'), imgSize[0], imgSize[1]);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_cellPx'), CELL * dpr);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_atlasGrid'), atlas.ax, atlas.ay);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_charCount'), RAMP.length);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_mouse'), mouseGL[0], mouseGL[1]);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_radius'), radius * dpr);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_pushMax'), pushMax * dpr * (0.55 + ms.intensity * 0.7));
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_colorMode'), colorMode);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_invert'), invert);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_contrast'), contrast);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_brightness'), brightDelta);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_time'), performance.now() * 0.001);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // ───── Pass 2: post-FX to default framebuffer ─────
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(progPost);
+    bindQuad(progPost);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.uniform1i(gl.getUniformLocation(progPost, 'u_scene'), 0);
+    gl.uniform2f(gl.getUniformLocation(progPost, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(progPost, 'u_mouse'), mouseGL[0], mouseGL[1]);
+    gl.uniform1f(gl.getUniformLocation(progPost, 'u_bloom'), bloomAmount);
+    gl.uniform1f(gl.getUniformLocation(progPost, 'u_crt'), crtAmount);
+    gl.uniform1f(gl.getUniformLocation(progPost, 'u_time'), performance.now() * 0.001);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    requestAnimationFrame(frame);
+  }
+
+  // ───── Placeholder ─────
+  const PLACEHOLDER_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 850'>
+    <defs>
+      <radialGradient id='head' cx='40%' cy='35%' r='60%'><stop offset='0%' stop-color='#fff'/><stop offset='60%' stop-color='#aaa'/><stop offset='100%' stop-color='#333'/></radialGradient>
+      <linearGradient id='torso' x1='20%' y1='0%' x2='80%' y2='100%'><stop offset='0%' stop-color='#666'/><stop offset='50%' stop-color='#aaa'/><stop offset='100%' stop-color='#222'/></linearGradient>
+    </defs>
+    <rect width='600' height='850' fill='#050507'/>
+    <ellipse cx='270' cy='150' rx='78' ry='95' fill='url(#head)'/>
+    <path d='M 175 285 Q 210 305 280 295 L 360 295 Q 425 305 440 380 Q 445 440 415 490 Q 360 510 280 500 L 220 490 Q 155 410 175 285 Z' fill='url(#torso)'/>
+    <path d='M 365 320 Q 440 290 445 215 Q 425 192 388 210 Q 365 250 345 290 Z' fill='#888'/>
+    <ellipse cx='418' cy='192' rx='34' ry='28' fill='#ccc'/>
+    <path d='M 215 370 Q 175 470 235 560 Q 280 605 330 625 L 355 605 Q 305 565 280 495 Q 245 425 225 370 Z' fill='#555'/>
+    <path d='M 220 480 Q 245 545 218 635 L 195 800 L 320 800 L 348 635 Q 388 555 348 480 Q 285 495 220 480 Z' fill='#444'/>
+  </svg>`;
+  const PLACEHOLDER_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
+
+  // ───── Events ─────
+  let resizeTO;
+  window.addEventListener('resize', () => { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 80); });
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  document.getElementById('file').addEventListener('change', e => { const f = e.target.files[0]; if (f) loadImage(URL.createObjectURL(f)); });
+  document.getElementById('cellSize').addEventListener('input', e => {
+    CELL = +e.target.value; document.getElementById('cellVal').textContent = CELL + 'px';
+    updateCellInfo();
+  });
+  document.getElementById('contrast').addEventListener('input', e => {
+    contrast = +e.target.value / 100; document.getElementById('contrastVal').textContent = contrast.toFixed(2);
+  });
+  document.getElementById('bloom').addEventListener('input', e => {
+    bloomAmount = +e.target.value / 100; document.getElementById('bloomVal').textContent = bloomAmount.toFixed(2);
+  });
+  document.getElementById('crt').addEventListener('input', e => {
+    crtAmount = +e.target.value / 100; document.getElementById('crtVal').textContent = crtAmount.toFixed(2);
+  });
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); colorMode = +b.dataset.mode;
+  }));
+  document.getElementById('invertBtn').addEventListener('click', e => {
+    invert = invert > 0.5 ? 0 : 1;
+    e.target.classList.toggle('active', invert > 0.5);
+  });
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    // Re-render once to make sure backbuffer is current
+    const link = document.createElement('a');
+    link.download = `ascii-shader-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  resize();
+  loadImage(PLACEHOLDER_URL);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

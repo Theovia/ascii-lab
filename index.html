@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ASCII Lab — Raul Chio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --line: rgba(255,255,255,0.10);
+    --line-strong: rgba(255,255,255,0.22);
+    --soft: rgba(255,255,255,0.45);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #fff;
+    min-height: 100%;
+  }
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(255,107,44,0.06), transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(70,230,196,0.04), transparent 50%);
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 80px 48px 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .header .logo {
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--soft);
+    margin-bottom: 18px;
+  }
+  .header h1 {
+    font-size: clamp(48px, 7vw, 96px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+    margin-bottom: 24px;
+  }
+  .header h1 .accent { color: #ff6b2c; font-weight: 800; }
+  .header h1 .ghost { color: rgba(255,255,255,0.4); font-weight: 300; }
+  .header p {
+    max-width: 640px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+  }
+  .header .meta-row {
+    display: flex; gap: 32px; flex-wrap: wrap;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .header .meta-row span b { color: #fff; font-weight: 600; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .card {
+    background: var(--bg);
+    padding: 32px 28px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 280px;
+    position: relative;
+    transition: background .25s ease;
+    overflow: hidden;
+  }
+  .card:hover { background: #111114; }
+  .card.coming { opacity: 0.55; cursor: not-allowed; }
+  .card .num {
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--soft);
+  }
+  .card h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+  .card .desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.65);
+    flex: 1;
+  }
+  .card .tech {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: auto;
+  }
+  .card .tech span {
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 2px;
+    color: rgba(255,255,255,0.7);
+  }
+  .card .badge {
+    position: absolute; top: 24px; right: 24px;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+  .card .badge.live { background: rgba(70,230,196,0.15); color: #46e6c4; border: 1px solid rgba(70,230,196,0.3); }
+  .card .badge.soon { background: rgba(255,255,255,0.05); color: var(--soft); border: 1px solid var(--line-strong); }
+  .card .arrow {
+    position: absolute; bottom: 24px; right: 24px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    transition: background .2s, color .2s, border-color .2s, transform .25s cubic-bezier(.2,.8,.3,1);
+  }
+  .card:hover .arrow { background: #ff6b2c; color: #0a0a0c; border-color: #ff6b2c; transform: rotate(-45deg); }
+
+  /* Color accents per card */
+  .card[data-accent="amber"] h2::before { content: '/'; color: #ff6b2c; margin-right: 8px; }
+  .card[data-accent="mint"] h2::before { content: '/'; color: #46e6c4; margin-right: 8px; }
+  .card[data-accent="rose"] h2::before { content: '/'; color: #ff4d6d; margin-right: 8px; }
+  .card[data-accent="purple"] h2::before { content: '/'; color: #c084fc; margin-right: 8px; }
+  .card[data-accent="cyan"] h2::before { content: '/'; color: #38bdf8; margin-right: 8px; }
+  .card[data-accent="lime"] h2::before { content: '/'; color: #a3e635; margin-right: 8px; }
+  .card[data-accent="grey"] h2::before { content: '/'; color: var(--soft); margin-right: 8px; }
+
+  .footer {
+    padding: 48px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 24px;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .footer a { color: #fff; text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+  .footer a:hover { border-color: #ff6b2c; }
+
+  /* Live ASCII corner per card (canvas) */
+  .card .preview {
+    position: absolute;
+    top: 50%; right: -20px;
+    transform: translateY(-50%);
+    width: 110px; height: 130px;
+    opacity: 0.18;
+    pointer-events: none;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 7px;
+    line-height: 7px;
+    color: rgba(255,255,255,0.7);
+    white-space: pre;
+    overflow: hidden;
+    user-select: none;
+  }
+  .card:hover .preview { opacity: 0.45; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">/// ASCII LAB ///</div>
+  <h1>
+    Cursor-reactive<br>
+    <span class="accent">portrait</span> <span class="ghost">studies</span>
+  </h1>
+  <p>
+    Studies on character-grid rendering — from brightness ramps to edge-detected Acerola-style line art, live webcam streams, and audio-driven displacement fields. Each variant is a single self-contained HTML file. Drop your own image.
+  </p>
+  <div class="meta-row">
+    <span><b>Stack</b> · Canvas 2D · WebAudio · WebGL (soon)</span>
+    <span><b>Variants</b> · 5 live · 3 in progress</span>
+    <span><b>Build</b> · Single-file HTML</span>
+  </div>
+</header>
+
+<section class="grid">
+
+  <a class="card" href="v0-foundation.html" data-accent="amber">
+    <span class="badge live">Live</span>
+    <div class="num">00 / Foundation</div>
+    <h2>Brightness ramp</h2>
+    <div class="desc">
+      Per-cell luminance sampling, glyph ramp with digits and symbols, true-color RGB modes, contrast/brightness sliders, cursor displacement field.
+    </div>
+    <div class="tech">
+      <span>Canvas 2D</span><span>RGB sampling</span><span>50K cells</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="preview" id="prev0"></div>
+  </a>
+
+  <a class="card" href="v1-edges.html" data-accent="mint">
+    <span class="badge live">Live</span>
+    <div class="num">01 / Edges</div>
+    <h2>DoG Acerola</h2>
+    <div class="desc">
+      Sobel gradient + Difference-of-Gaussians for edge detection. Per-cell edge direction quantized into <code>/ \ | _</code> chars. Result: hand-drawn line-art look on top of brightness fill.
+    </div>
+    <div class="tech">
+      <span>Sobel</span><span>DoG</span><span>4-bin direction</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="preview" id="prev1"></div>
+  </a>
+
+  <a class="card" href="v2-webcam.html" data-accent="rose">
+    <span class="badge live">Live</span>
+    <div class="num">02 / Webcam</div>
+    <h2>Live ASCII</h2>
+    <div class="desc">
+      <code>getUserMedia</code> + per-frame ASCII render with cursor reaction. Hybrid edge+fill mode at 30fps. Mirror toggle, snap to PNG. Asks for camera permission.
+    </div>
+    <div class="tech">
+      <span>getUserMedia</span><span>Real-time</span><span>30fps</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="preview" id="prev2"></div>
+  </a>
+
+  <a class="card" href="v3-audio.html" data-accent="purple">
+    <span class="badge live">Live</span>
+    <div class="num">03 / Audio</div>
+    <h2>FFT-Reactive</h2>
+    <div class="desc">
+      Drop an mp3 — bass drives cursor radius pulse, mids inject random glyph swaps (glitch), highs shift hue. Auto-cursor orbits with the kick when no mouse present.
+    </div>
+    <div class="tech">
+      <span>WebAudio</span><span>FFT 1024</span><span>3-band split</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="preview" id="prev3"></div>
+  </a>
+
+  <a class="card" href="v4-shader.html" data-accent="cyan">
+    <span class="badge live">Live</span>
+    <div class="num">04 / Shader</div>
+    <h2>WebGL2 SDF atlas</h2>
+    <div class="desc">
+      Renderer en fragment shader. Glyph atlas como texture. Two-pass: ASCII → FBO → bloom + chromatic aberration + CRT scanlines + vignette. Cell hasta 2px sub-pixel.
+    </div>
+    <div class="tech">
+      <span>WebGL2</span><span>GLSL</span><span>Glyph atlas</span><span>2-pass FX</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="preview" id="prev4"></div>
+  </a>
+
+  <div class="card coming" data-accent="lime">
+    <span class="badge soon">Soon</span>
+    <div class="num">05 / Depth</div>
+    <h2>Parallax 3D</h2>
+    <div class="desc">
+      Depth-Anything via ONNX-runtime-web → per-pixel depth map. Chars push by depth on cursor move = volumetric parallax from a 2D photo.
+    </div>
+    <div class="tech">
+      <span>ONNX</span><span>Depth-Anything</span><span>Parallax</span>
+    </div>
+  </div>
+
+  <div class="card coming" data-accent="rose">
+    <span class="badge soon">Soon</span>
+    <div class="num">06 / Dither</div>
+    <h2>Floyd-Steinberg + palette</h2>
+    <div class="desc">
+      Color quantize to 8-16 colors NES/Gameboy-style. Error diffusion across cells. Limited palette + char ramp = pure retrocomputing aesthetic.
+    </div>
+    <div class="tech">
+      <span>FS dither</span><span>Color quant</span><span>Palette LUT</span>
+    </div>
+  </div>
+
+  <div class="card coming" data-accent="grey">
+    <span class="badge soon">Soon</span>
+    <div class="num">07 / Style</div>
+    <h2>Neural pre-pass</h2>
+    <div class="desc">
+      Small ONNX style-transfer model in browser. Apply sketch / oil / anime stylization before the ASCII pipeline. AI + character art compounded.
+    </div>
+    <div class="tech">
+      <span>ONNX</span><span>Style transfer</span><span>WebGPU</span>
+    </div>
+  </div>
+
+</section>
+
+<footer class="footer">
+  <span>Raul Chio · 2026 · <a href="https://eigenatlas.com">eigenatlas.com</a></span>
+  <span>Inspired by <a href="https://good-fella.com" target="_blank">good-fella.com</a> · Acerola DoG technique</span>
+</footer>
+
+<script>
+// Tiny static ASCII previews per card (decorative only)
+const PREVIEW = `
+       ##@@@@@@@@@##
+     @@@         @@@
+    @@   @@@@@@@@   @@
+   @@   @         @  @@
+   @   @@   @@@@   @  @
+   @   @@   @@@@   @  @
+   @    @         @   @
+    @@   @@@@@@@@@   @@
+     @@@           @@@
+       ###@@@@@@###
+      8888####8888
+       %%%MM&&MM%%
+        |||  |||
+        ||    ||
+       /         \\
+`.trim();
+['prev0','prev1','prev2','prev3','prev4'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = PREVIEW;
+});
+</script>
+
+</body>
+</html>

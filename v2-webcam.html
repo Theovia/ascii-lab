@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>v2 — Webcam Live ASCII</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #050507; --fg: #ff4d6d; --line: rgba(255,255,255,0.16); --soft: rgba(255,255,255,0.4); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; font-family: 'Inter', system-ui, sans-serif; color: #fff; }
+  body { cursor: crosshair; }
+  canvas#ascii { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  video#cam { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .badge { position: fixed; top: 24px; right: 24px; background: var(--fg); color: #050507; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; padding: 11px 18px; border-radius: 2px; text-decoration: none; z-index: 10; }
+  .brand { position: fixed; top: 24px; left: 24px; z-index: 10; font-size: 13px; letter-spacing: 0.04em; color: rgba(255,255,255,0.85); }
+  .brand b { color: var(--fg); font-weight: 600; }
+  .brand small { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); margin-top: 4px; }
+  .meta { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--soft); text-align: center; line-height: 1.7; }
+  .meta b { color: var(--fg); font-weight: 600; }
+  .meta .live::before { content: '●'; color: #ff4d6d; margin-right: 6px; animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .panel { position: fixed; left: 24px; right: 24px; bottom: 24px; z-index: 10; display: flex; gap: 14px; align-items: stretch; padding: 14px 18px; background: rgba(15, 15, 18, 0.78); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid var(--line); border-radius: 4px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
+  .panel .group { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 0 0 auto; }
+  .panel .group.flex { flex: 1 1 auto; min-width: 130px; }
+  .panel .group .label { color: rgba(255,255,255,0.4); }
+  .panel .group .value { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .panel .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 2px; cursor: pointer; background: transparent; color: rgba(255,255,255,0.85); font-family: inherit; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; transition: border-color .2s, color .2s, background .2s; white-space: nowrap; }
+  .panel button:hover { border-color: var(--fg); color: #fff; }
+  .panel button.active { background: var(--fg); color: #050507; border-color: var(--fg); }
+  .panel input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: ew-resize; margin: 0; }
+  .panel input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line); border-radius: 1px; }
+  .panel input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; margin-top: -4px; background: var(--fg); border-radius: 50%; border: 2px solid #050507; transition: transform .15s; }
+  .home { position: fixed; top: 24px; left: 240px; z-index: 10; color: var(--soft); text-decoration: none; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px; }
+  .home:hover { color: #fff; border-color: var(--fg); }
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5, 5, 7, 0.92); backdrop-filter: blur(8px); z-index: 50;
+    font-size: 14px; letter-spacing: 0.06em; color: rgba(255,255,255,0.7);
+    text-align: center; pointer-events: auto; padding: 24px;
+  }
+  .overlay button {
+    margin-top: 24px; padding: 14px 28px; background: var(--fg); color: #050507;
+    border: 0; border-radius: 2px; cursor: pointer; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px;
+  }
+  .overlay.hidden { display: none; }
+  .err { color: #ff4d6d; margin-top: 12px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <canvas id="ascii"></canvas>
+  <video id="cam" autoplay playsinline muted></video>
+
+  <div class="brand">
+    Raul Chio · <b>ASCII Lab</b>
+    <small>v2 · Webcam Live</small>
+  </div>
+  <a class="home" href="index.html">← lab</a>
+
+  <div class="meta">
+    <span class="live"></span><b id="fpsInfo">— fps</b> · <span id="cellInfo">—</span><br />
+    Live ASCII · <span id="modeInfo">brightness</span>
+  </div>
+
+  <a class="badge" href="#">v2 / live</a>
+
+  <div class="overlay" id="overlay">
+    <div>
+      <div>Permission needed for camera access.</div>
+      <button id="startBtn">Start camera</button>
+      <div class="err" id="errMsg"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="group flex">
+      <div class="row"><span class="label">Cell</span><span class="value" id="cellVal">8px</span></div>
+      <input type="range" id="cellSize" min="4" max="16" step="1" value="8" />
+    </div>
+    <div class="group flex">
+      <div class="row"><span class="label">Edge thresh</span><span class="value" id="threshVal">0.20</span></div>
+      <input type="range" id="thresh" min="0" max="60" step="1" value="20" />
+    </div>
+    <div class="group">
+      <span class="label">Render</span>
+      <div class="row">
+        <button data-render="bright" class="active">Bright</button>
+        <button data-render="hybrid">Hybrid</button>
+        <button data-render="edges">Edges</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="label">Color</span>
+      <div class="row">
+        <button data-color="rose" class="active">Rose</button>
+        <button data-color="amber">Amber</button>
+        <button data-color="mint">Mint</button>
+        <button data-color="true">True</button>
+        <button data-color="mono">Mono</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="label">Action</span>
+      <div class="row">
+        <button id="mirrorBtn" class="active">Mirror</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="snapBtn">Snap PNG</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('ascii');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const video = document.getElementById('cam');
+  const sample = document.createElement('canvas');
+  const sampleCtx = sample.getContext('2d', { willReadFrequently: true });
+
+  const FILL_RAMP = ' .\'`,:;!iI?ltjf1234567890[]{}|()*#$@%MW&8B';
+  const EDGE_CHARS = ['|', '\\', '_', '/'];
+
+  const PALETTES = {
+    rose:  { hue: 345, sat: 80, baseL: 28, gainL: 56 },
+    amber: { hue: 28,  sat: 88, baseL: 22, gainL: 56 },
+    mint:  { hue: 158, sat: 70, baseL: 28, gainL: 55 },
+    mono:  { hue: 0,   sat: 0,  baseL: 25, gainL: 60 },
+  };
+  let colorKey = 'rose';
+  let renderMode = 'bright';   // bright | hybrid | edges
+  let CELL = 8;
+  let FONT_PX = 12;
+  let mirror = true;
+  let paused = false;
+  let edgeThresh = 0.20;
+
+  let cols = 0, rows = 0, originX = 0, originY = 0;
+  let stream = null;
+
+  const mouse = { x: -9999, y: -9999, lx: -9999, ly: -9999 };
+  const ms = { x: -9999, y: -9999, intensity: 0 };
+  const RADIUS = 200, PUSH_MAX = 22;
+  const BG = '#050507';
+
+  function fontFor(cell) { return Math.max(5, Math.round(cell * 1.6)); }
+
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layoutGrid();
+  }
+
+  function layoutGrid() {
+    if (!video.videoWidth) return;
+    const w = window.innerWidth, h = window.innerHeight;
+    const ar = video.videoWidth / video.videoHeight;
+    let targetH = h * 0.92;
+    let targetW = targetH * ar;
+    if (targetW > w * 0.92) { targetW = w * 0.92; targetH = targetW / ar; }
+    const cellW = CELL, cellH = Math.round(CELL * 1.55);
+    cols = Math.max(2, Math.floor(targetW / cellW));
+    rows = Math.max(2, Math.floor(targetH / cellH));
+    originX = (w - cols * cellW) / 2;
+    originY = (h - rows * cellH) / 2;
+    sample.width = cols; sample.height = rows;
+    document.getElementById('cellInfo').textContent = `${cols}×${rows}`;
+  }
+
+  async function startCam() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: 'user' },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await new Promise(r => video.onloadedmetadata = r);
+      await video.play();
+      layoutGrid();
+      document.getElementById('overlay').classList.add('hidden');
+    } catch (e) {
+      document.getElementById('errMsg').textContent = `Error: ${e.message}`;
+    }
+  }
+
+  function colorFor(R, G, B, b, isEdge) {
+    if (colorKey === 'true') {
+      const max = Math.max(R, G, B), min = Math.min(R, G, B);
+      const lum = (max + min) / 510;
+      const targetL = 0.34 + b * 0.55;
+      const k = lum > 0 ? Math.min(2.5, targetL / lum) : 1;
+      return `rgb(${Math.min(255, R * k)|0},${Math.min(255, G * k)|0},${Math.min(255, B * k)|0})`;
+    }
+    const p = PALETTES[colorKey] || PALETTES.rose;
+    const light = p.baseL + b * p.gainL + (isEdge ? 8 : 0);
+    return `hsl(${p.hue}, ${p.sat}%, ${light}%)`;
+  }
+
+  // FPS
+  let fpsCount = 0, fpsT0 = performance.now(), fpsCurrent = 0;
+  function tickFps() {
+    fpsCount++;
+    const now = performance.now();
+    if (now - fpsT0 > 500) {
+      fpsCurrent = fpsCount * 1000 / (now - fpsT0);
+      document.getElementById('fpsInfo').textContent = fpsCurrent.toFixed(0) + ' fps';
+      fpsCount = 0; fpsT0 = now;
+    }
+  }
+
+  function frame() {
+    ms.x += (mouse.x - ms.x) * 0.22;
+    ms.y += (mouse.y - ms.y) * 0.22;
+    const speed = Math.hypot(mouse.x - mouse.lx, mouse.y - mouse.ly);
+    mouse.lx = mouse.x; mouse.ly = mouse.y;
+    ms.intensity += (Math.min(speed, 80) / 80 - ms.intensity) * 0.08;
+
+    const w = window.innerWidth, h = window.innerHeight;
+    ctx.fillStyle = BG; ctx.fillRect(0, 0, w, h);
+
+    if (!video.videoWidth || paused) {
+      requestAnimationFrame(frame);
+      return;
+    }
+
+    if (cols === 0 || rows === 0) layoutGrid();
+
+    // Sample current frame
+    if (mirror) {
+      sampleCtx.save();
+      sampleCtx.translate(cols, 0);
+      sampleCtx.scale(-1, 1);
+      sampleCtx.drawImage(video, 0, 0, cols, rows);
+      sampleCtx.restore();
+    } else {
+      sampleCtx.drawImage(video, 0, 0, cols, rows);
+    }
+    const pixels = sampleCtx.getImageData(0, 0, cols, rows).data;
+
+    // Build brightness grid
+    const total = cols * rows;
+    const lum = new Float32Array(total);
+    for (let i = 0; i < total; i++) {
+      const p = i * 4;
+      lum[i] = (0.299 * pixels[p] + 0.587 * pixels[p+1] + 0.114 * pixels[p+2]) / 255;
+    }
+
+    // Sobel for edges (small, fast)
+    let edgeMag = null, edgeBin = null;
+    if (renderMode !== 'bright') {
+      edgeMag = new Float32Array(total);
+      edgeBin = new Uint8Array(total);
+      let maxMag = 0.0001;
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = y * cols + x;
+          const tl = lum[i - cols - 1], tc = lum[i - cols], tr = lum[i - cols + 1];
+          const ml = lum[i - 1],                            mr = lum[i + 1];
+          const bl = lum[i + cols - 1], bc = lum[i + cols], br = lum[i + cols + 1];
+          const gx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+          const gy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+          const m = Math.hypot(gx, gy);
+          edgeMag[i] = m;
+          if (m > maxMag) maxMag = m;
+          let phi = Math.atan2(gy, gx);
+          if (phi < 0) phi += Math.PI;
+          edgeBin[i] = Math.round(phi / (Math.PI / 4)) % 4;
+        }
+      }
+      for (let i = 0; i < total; i++) edgeMag[i] /= maxMag;
+    }
+
+    // Render
+    FONT_PX = fontFor(CELL);
+    ctx.font = `500 ${FONT_PX}px 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace`;
+    ctx.textBaseline = 'top';
+
+    const cellW = CELL, cellH = Math.round(CELL * 1.55);
+    const cx = ms.x, cy = ms.y;
+    const RADIUS_SQ = RADIUS * RADIUS;
+    const cursorActive = mouse.x > -1000;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        let b = lum[idx];
+        const m = edgeMag ? edgeMag[idx] : 0;
+        const isEdge = m > edgeThresh;
+
+        let ch;
+        if (renderMode === 'edges') {
+          if (!isEdge) continue;
+          ch = EDGE_CHARS[edgeBin[idx]];
+        } else if (renderMode === 'hybrid') {
+          if (isEdge) ch = EDGE_CHARS[edgeBin[idx]];
+          else {
+            if (b < 0.06) continue;
+            ch = FILL_RAMP[Math.floor(b * (FILL_RAMP.length - 1))];
+          }
+        } else {
+          if (b < 0.06) continue;
+          ch = FILL_RAMP[Math.floor(b * (FILL_RAMP.length - 1))];
+        }
+
+        const baseX = originX + c * cellW;
+        const baseY = originY + r * cellH;
+        let x = baseX, y = baseY;
+
+        if (cursorActive) {
+          const dx = baseX - cx, dy = baseY - cy;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < RADIUS_SQ) {
+            const d = Math.sqrt(d2);
+            const f = 1 - d / RADIUS;
+            const fs = f * f * (3 - 2 * f);
+            const a = Math.atan2(dy, dx);
+            const push = PUSH_MAX * fs * (0.55 + ms.intensity * 0.7);
+            x += Math.cos(a) * push;
+            y += Math.sin(a) * push;
+            b = Math.min(1, b + fs * 0.45);
+          }
+        }
+
+        const pi = idx * 4;
+        const R = pixels[pi], G = pixels[pi+1], B = pixels[pi+2];
+        ctx.fillStyle = colorFor(R, G, B, b, isEdge);
+        ctx.fillText(ch, x, y);
+      }
+    }
+
+    tickFps();
+    requestAnimationFrame(frame);
+  }
+
+  // Events
+  let resizeTO;
+  window.addEventListener('resize', () => { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 80); });
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+  document.getElementById('startBtn').addEventListener('click', startCam);
+  document.getElementById('cellSize').addEventListener('input', e => {
+    CELL = +e.target.value; document.getElementById('cellVal').textContent = CELL + 'px';
+    layoutGrid();
+  });
+  document.getElementById('thresh').addEventListener('input', e => {
+    edgeThresh = +e.target.value / 100; document.getElementById('threshVal').textContent = edgeThresh.toFixed(2);
+  });
+  document.querySelectorAll('[data-render]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-render]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); renderMode = b.dataset.render;
+    document.getElementById('modeInfo').textContent = renderMode;
+  }));
+  document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-color]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); colorKey = b.dataset.color;
+  }));
+  document.getElementById('mirrorBtn').addEventListener('click', e => {
+    mirror = !mirror; e.target.classList.toggle('active', mirror);
+  });
+  document.getElementById('pauseBtn').addEventListener('click', e => {
+    paused = !paused; e.target.classList.toggle('active', paused); e.target.textContent = paused ? 'Resume' : 'Pause';
+  });
+  document.getElementById('snapBtn').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = `ascii-webcam-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png'); link.click();
+  });
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

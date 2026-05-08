@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Raul Chio — Frontend Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060608;
+    --fg: #ff6b2c;
+    --line: rgba(255,255,255,0.10);
+    --line-2: rgba(255,255,255,0.18);
+    --soft: rgba(255,255,255,0.45);
+    --text: rgba(255,255,255,0.92);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body {
+    background: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--text);
+    overflow-x: hidden;
+  }
+  body { cursor: crosshair; }
+  ::selection { background: var(--fg); color: var(--bg); }
+
+  /* ───── Nav ───── */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 32px;
+    z-index: 50;
+    mix-blend-mode: difference;
+  }
+  .nav .logo {
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: #fff;
+  }
+  .nav .links { display: flex; gap: 28px; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .nav .links a { color: rgba(255,255,255,0.72); text-decoration: none; transition: color .2s; }
+  .nav .links a:hover { color: #fff; }
+  .nav .cta {
+    background: var(--fg); color: #060608;
+    padding: 10px 16px; border-radius: 2px;
+    font-family: 'Inter', sans-serif; font-weight: 700; font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    text-decoration: none; mix-blend-mode: normal;
+    transition: transform .25s cubic-bezier(.2,.8,.3,1), background .2s;
+  }
+  .nav .cta:hover { transform: scale(1.05); background: #ff7d44; }
+
+  /* ───── Hero ───── */
+  .hero {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  .hero .overlay {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 60px 32px 100px;
+  }
+  .hero h1 {
+    font-size: clamp(40px, 7vw, 110px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+    max-width: 1100px;
+    text-shadow: 0 2px 30px rgba(0,0,0,0.7);
+  }
+  .hero h1 .accent { color: var(--fg); }
+  .hero h1 .ghost { color: rgba(255,255,255,0.36); font-weight: 300; font-style: italic; }
+  .hero .meta {
+    margin-top: 28px;
+    display: flex; gap: 32px; flex-wrap: wrap;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--soft);
+    text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+  }
+  .hero .meta span b { color: #fff; font-weight: 600; }
+  .hero .scroll-hint {
+    position: absolute; left: 32px; bottom: 32px; z-index: 5;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+  .hero .status {
+    position: absolute; right: 32px; bottom: 32px; z-index: 5;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+  }
+  .hero .status .dot {
+    width: 8px; height: 8px; background: #46e6c4;
+    border-radius: 50%; box-shadow: 0 0 12px #46e6c4;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ───── Sections ───── */
+  section { padding: 140px 32px; max-width: 1280px; margin: 0 auto; }
+  .section-num {
+    font-family: 'Geist Mono', ui-monospace, Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--soft);
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 32px;
+  }
+  .section-num::before { content: ''; width: 28px; height: 1px; background: var(--fg); }
+  .section-num b { color: #fff; font-weight: 600; }
+
+  .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
+  .about h2 { font-size: clamp(36px, 4.5vw, 64px); font-weight: 800; line-height: 0.98; letter-spacing: -0.02em; }
+  .about h2 em { color: var(--fg); font-style: normal; font-weight: 800; }
+  .about .lede { font-size: 18px; line-height: 1.55; color: rgba(255,255,255,0.78); margin-bottom: 20px; }
+  .about .body { font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.6); }
+  @media (max-width: 800px) { .about-grid { grid-template-columns: 1fr; gap: 32px; } }
+
+  .work-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (max-width: 800px) { .work-grid { grid-template-columns: 1fr; } }
+  .work-card { background: var(--bg); padding: 40px 32px; display: flex; flex-direction: column; gap: 20px; min-height: 320px; cursor: pointer; transition: background .25s ease; text-decoration: none; color: inherit; position: relative; }
+  .work-card:hover { background: #0e0e10; }
+  .work-card .tag { font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  .work-card h3 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
+  .work-card .preview-line { font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 9px; line-height: 11px; color: rgba(255,107,44,0.55); white-space: pre; overflow: hidden; margin-top: auto; user-select: none; pointer-events: none; }
+  .work-card .arrow {
+    position: absolute; top: 32px; right: 32px;
+    width: 32px; height: 32px;
+    border: 1px solid var(--line-2); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    transition: background .2s, color .2s, border-color .2s, transform .25s cubic-bezier(.2,.8,.3,1);
+  }
+  .work-card:hover .arrow { background: var(--fg); color: var(--bg); border-color: var(--fg); transform: rotate(-45deg); }
+
+  .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (max-width: 900px) { .services-grid { grid-template-columns: 1fr; } }
+  .svc { background: var(--bg); padding: 40px 32px; display: flex; flex-direction: column; gap: 20px; min-height: 380px; }
+  .svc.feature { background: #0e0e10; border: 1px solid var(--fg); position: relative; z-index: 2; }
+  .svc.feature::before { content: 'Recommended'; position: absolute; top: -10px; left: 32px; background: var(--fg); color: var(--bg); font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 600; }
+  .svc .tier { font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--soft); }
+  .svc .name { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .svc .price { font-size: 36px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+  .svc .price small { font-size: 13px; font-weight: 500; color: var(--soft); margin-left: 6px; letter-spacing: 0.04em; }
+  .svc ul { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; }
+  .svc ul li { font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.7); display: flex; gap: 10px; }
+  .svc ul li::before { content: '+'; color: var(--fg); font-family: 'Geist Mono', monospace; flex-shrink: 0; }
+  .svc .cta { margin-top: auto; display: inline-block; padding: 12px 18px; border: 1px solid var(--line-2); border-radius: 2px; text-decoration: none; color: #fff; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; text-align: center; transition: border-color .2s, background .2s, color .2s; }
+  .svc .cta:hover { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .svc.feature .cta { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .svc.feature .cta:hover { background: #ff7d44; }
+
+  .contact { text-align: center; padding: 180px 32px; }
+  .contact h2 { font-size: clamp(48px, 8vw, 120px); font-weight: 800; letter-spacing: -0.04em; line-height: 0.92; margin-bottom: 32px; }
+  .contact h2 em { color: var(--fg); font-style: normal; }
+  .contact .email { display: inline-block; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: clamp(18px, 2.5vw, 28px); color: #fff; text-decoration: none; border-bottom: 2px solid var(--line-2); padding-bottom: 8px; transition: border-color .2s; }
+  .contact .email:hover { border-color: var(--fg); }
+  .contact .channels { margin-top: 60px; display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
+  .contact .channels a { color: rgba(255,255,255,0.7); text-decoration: none; border-bottom: 1px solid var(--line-2); padding-bottom: 4px; transition: color .2s, border-color .2s; }
+  .contact .channels a:hover { color: #fff; border-color: var(--fg); }
+
+  .footer { border-top: 1px solid var(--line); padding: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  .footer a { color: #fff; text-decoration: none; border-bottom: 1px solid var(--line-2); }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.3,1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="logo">/// Raul Chio</div>
+  <div class="links">
+    <a href="#about">About</a>
+    <a href="#work">Work</a>
+    <a href="#services">Services</a>
+  </div>
+  <a class="cta" href="#contact">Let's work together</a>
+</nav>
+
+<section class="hero">
+  <canvas id="gl"></canvas>
+  <div class="overlay">
+    <h1>
+      Frontend studio<br>
+      that <em class="ghost">moves</em> like<br>
+      <em class="accent">precision art.</em>
+    </h1>
+    <div class="meta">
+      <span><b>Stack</b> · WebGL · GLSL · React · Next</span>
+      <span><b>Studios</b> · MX · Remote</span>
+      <span><b>Available</b> · Q3 2026</span>
+    </div>
+  </div>
+  <div class="scroll-hint">— scroll —</div>
+  <div class="status"><span class="dot"></span><span>Live · WebGL2 ASCII</span></div>
+</section>
+
+<section id="about" class="about reveal">
+  <div class="section-num"><b>00</b> · About</div>
+  <div class="about-grid">
+    <div>
+      <h2>Sites that <em>move</em> with the cursor — not against it.</h2>
+    </div>
+    <div>
+      <p class="lede">Production frontends where every interaction earns its place. WebGL where pixels matter. CSS where simplicity wins. No motion for motion's sake.</p>
+      <p class="body">Trained in protein engineering, working in code. The hero you scrolled through is a fragment shader rendering 100,000+ characters per frame at 60fps. Each cell samples your image, looks up a glyph atlas, runs a chromatic aberration pass, and finishes through a CRT scanline. No framework dependencies. Just the metal.</p>
+    </div>
+  </div>
+</section>
+
+<section id="work" class="reveal">
+  <div class="section-num"><b>01</b> · Selected Work</div>
+  <div class="work-grid">
+    <a class="work-card" href="#"><span class="tag">2026 · Healthcare</span><h3>Eigen Medical</h3><span class="arrow">→</span><div class="preview-line">@@@##**+++===---::::....
+@@##*++====---:::::....
+##*++==---::::::.......
+*+==---::::::........
++==--::::::........    </div></a>
+    <a class="work-card" href="#"><span class="tag">2026 · Hospitality</span><h3>Cosalá Hotels</h3><span class="arrow">→</span><div class="preview-line">####@@@@@@&&&&%%%%###
+@@@@@&&%%%###***+++==
+&&%%###***+++===---::
+%###***++==---:::....
+***+==---::::........</div></a>
+    <a class="work-card" href="#"><span class="tag">2026 · B2B Lab</span><h3>TSC Labs</h3><span class="arrow">→</span><div class="preview-line">||||||/\/\/\/\/\/\/\/\
+||||/\/\/\/\/\/\/\/\/\
+/\/\/\/\/\/\/\/\/\____
+/\/\/\/\____________..
+______________________</div></a>
+    <a class="work-card" href="#"><span class="tag">2026 · Heavy</span><h3>Magal Tractopartes</h3><span class="arrow">→</span><div class="preview-line">8888&&MM%%###@@@@@@@@@
+&&MM%%###@@@@@@******+
+%%###@@@******+++++===
+@@******++++====------
+*+++====-------:::::..</div></a>
+  </div>
+</section>
+
+<section id="services" class="reveal">
+  <div class="section-num"><b>02</b> · Services</div>
+  <h2 style="font-size: clamp(36px, 4.5vw, 64px); font-weight: 800; line-height: 0.98; letter-spacing: -0.02em; max-width: 720px; margin-bottom: 60px;">
+    One pricing. Three commitments. <em style="color: var(--fg); font-style: normal;">Pick a plan. Ship faster.</em>
+  </h2>
+  <div class="services-grid">
+    <div class="svc"><div class="tier">Tier · Spark</div><div class="name">Single landing</div><div class="price">$2.5K<small>USD · one-time</small></div><ul><li>1 landing page, fully designed + dev</li><li>Custom WebGL hero (or 3D parallax)</li><li>CMS-ready · Cloudflare Pages</li><li>2 revision rounds</li><li>10 day delivery</li></ul><a class="cta" href="#contact">Book scope call</a></div>
+    <div class="svc feature"><div class="tier">Tier · Studio</div><div class="name">Monthly retainer</div><div class="price">$5K<small>USD · per month</small></div><ul><li>Submit unlimited requests via Slack</li><li>One active task at a time, your priority</li><li>48h average turnaround</li><li>Pause or cancel anytime</li><li>Includes design + dev + deploy</li></ul><a class="cta" href="#contact">Subscribe</a></div>
+    <div class="svc"><div class="tier">Tier · Bespoke</div><div class="name">Full product</div><div class="price">$25K+<small>USD · scoped</small></div><ul><li>SaaS / product dashboard / B2B platform</li><li>Full system: design → dev → infra</li><li>WebGL, real-time, voice, agents</li><li>Cloudflare-native deployment</li><li>6-12 week engagements</li></ul><a class="cta" href="#contact">Discuss</a></div>
+  </div>
+</section>
+
+<section id="contact" class="contact reveal">
+  <div class="section-num"><b>03</b> · Contact</div>
+  <h2>Got something <em>worth shipping?</em></h2>
+  <a class="email" href="mailto:hello@eigenatlas.com">hello@eigenatlas.com</a>
+  <div class="channels">
+    <a href="#">Schedule call</a>
+    <a href="#">Telegram</a>
+    <a href="#">Twitter / X</a>
+    <a href="#">Github</a>
+  </div>
+</section>
+
+<footer class="footer">
+  <span>Raul Chio · 2026 — All systems custom-built.</span>
+  <span>Hero rendered with <a href="v4-shader.html">WebGL2 fragment shader</a></span>
+</footer>
+
+<!-- Vertex shader -->
+<script id="vs" type="x-shader/x-vertex">#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+</script>
+
+<!-- ASCII pass — same as v4-shader.html (full visual treatment) -->
+<script id="fs_ascii" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+
+uniform sampler2D u_image;
+uniform sampler2D u_atlas;
+uniform vec2 u_resolution;
+uniform vec2 u_imgSize;
+uniform float u_cellPx;
+uniform vec2 u_atlasGrid;
+uniform float u_charCount;
+uniform vec2 u_mouse;
+uniform float u_radius;
+uniform float u_pushMax;
+uniform int u_colorMode;
+uniform float u_contrast;
+uniform float u_brightness;
+
+const float CELL_AR = 1.55;
+
+vec3 hslToRgb(float h, float s, float l) {
+  h = mod(h / 360.0, 1.0);
+  float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+  float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+  float m = l - c * 0.5;
+  vec3 rgb;
+       if (h < 1.0/6.0) rgb = vec3(c, x, 0.0);
+  else if (h < 2.0/6.0) rgb = vec3(x, c, 0.0);
+  else if (h < 3.0/6.0) rgb = vec3(0.0, c, x);
+  else if (h < 4.0/6.0) rgb = vec3(0.0, x, c);
+  else if (h < 5.0/6.0) rgb = vec3(x, 0.0, c);
+  else                  rgb = vec3(c, 0.0, x);
+  return rgb + m;
+}
+
+void main() {
+  vec2 fragPx = v_uv * u_resolution;
+
+  vec2 toM = fragPx - u_mouse;
+  float distM = length(toM);
+  float fInf = 1.0 - clamp(distM / u_radius, 0.0, 1.0);
+  fInf = smoothstep(0.0, 1.0, fInf);
+  vec2 dir = distM > 0.5 ? toM / distM : vec2(0.0);
+  vec2 pushPx = dir * fInf * u_pushMax;
+  vec2 distortedPx = fragPx + pushPx;
+
+  // Letterbox
+  float canvasAR = u_resolution.x / u_resolution.y;
+  float imgAR = u_imgSize.x / u_imgSize.y;
+  float marginScale = 0.94;
+  float fitH, fitW;
+  if (canvasAR > imgAR) { fitH = u_resolution.y * marginScale; fitW = fitH * imgAR; }
+  else                   { fitW = u_resolution.x * marginScale; fitH = fitW / imgAR; }
+  vec2 fitOrigin = (u_resolution - vec2(fitW, fitH)) * 0.5;
+
+  float cellW = u_cellPx;
+  float cellH = u_cellPx * CELL_AR;
+  vec2 cellSize = vec2(cellW, cellH);
+  vec2 inFit = distortedPx - fitOrigin;
+  vec2 cellId = floor(inFit / cellSize);
+  vec2 cellOrigin = cellId * cellSize;
+  vec2 cellLocal = (inFit - cellOrigin) / cellSize;
+  vec2 cellCenterPx = fitOrigin + cellOrigin + cellSize * 0.5;
+  vec2 cellCenterUV = (cellCenterPx - fitOrigin) / vec2(fitW, fitH);
+
+  if (cellCenterUV.x < 0.0 || cellCenterUV.x > 1.0 || cellCenterUV.y < 0.0 || cellCenterUV.y > 1.0) {
+    outColor = vec4(0.022, 0.022, 0.030, 1.0);
+    return;
+  }
+
+  vec4 src = texture(u_image, cellCenterUV);
+  float lum = dot(src.rgb, vec3(0.299, 0.587, 0.114));
+  lum = (lum - 0.5) * u_contrast + 0.5 + u_brightness;
+
+  float cellDist = length(cellCenterPx - u_mouse);
+  float boost = smoothstep(u_radius, 0.0, cellDist) * 0.55;
+  lum = clamp(lum + boost, 0.0, 1.0);
+
+  float charIdx = floor(lum * (u_charCount - 0.0001));
+  charIdx = clamp(charIdx, 0.0, u_charCount - 1.0);
+
+  float ax = u_atlasGrid.x;
+  float ay = u_atlasGrid.y;
+  float col = mod(charIdx, ax);
+  float row = floor(charIdx / ax);
+  vec2 atlasCell = vec2(col, row);
+  vec2 atlasUV = (atlasCell + vec2(cellLocal.x, 1.0 - cellLocal.y)) / vec2(ax, ay);
+  float glyph = texture(u_atlas, atlasUV).r;
+  glyph = smoothstep(0.4, 0.6, glyph);
+
+  vec3 color = vec3(0.0);
+  float boostHue = boost * 22.0;
+  if (u_colorMode == 0)      color = hslToRgb(28.0 + boostHue, 0.88, 0.22 + lum * 0.55);
+  else if (u_colorMode == 1) {
+    float baseLum = max(0.01, dot(src.rgb, vec3(0.333)));
+    float k = (lum * 0.85 + 0.15) / baseLum;
+    color = clamp(src.rgb * k, 0.0, 1.0);
+  } else                     color = vec3(0.10 + lum * 0.85);
+
+  outColor = vec4(color * glyph, glyph);
+}
+</script>
+
+<!-- Post pass — bloom + chromatic aberration + CRT + vignette (full v4 treatment) -->
+<script id="fs_post" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 outColor;
+uniform sampler2D u_scene;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_bloom;
+uniform float u_crt;
+
+vec3 sampleBloom(vec2 uv) {
+  vec3 acc = vec3(0.0);
+  vec2 px = 1.0 / u_resolution;
+  vec2 offs[9];
+  offs[0]=vec2(-2,-2); offs[1]=vec2(0,-2); offs[2]=vec2(2,-2);
+  offs[3]=vec2(-2, 0); offs[4]=vec2(0, 0); offs[5]=vec2(2, 0);
+  offs[6]=vec2(-2, 2); offs[7]=vec2(0, 2); offs[8]=vec2(2, 2);
+  float w[9];
+  w[0]=1.0; w[1]=2.0; w[2]=1.0;
+  w[3]=2.0; w[4]=4.0; w[5]=2.0;
+  w[6]=1.0; w[7]=2.0; w[8]=1.0;
+  float total = 0.0;
+  for (int i = 0; i < 9; i++) {
+    vec3 c = texture(u_scene, uv + offs[i] * px * 3.0).rgb;
+    float l = dot(c, vec3(0.299, 0.587, 0.114));
+    c *= smoothstep(0.4, 1.0, l);
+    acc += c * w[i];
+    total += w[i];
+  }
+  return acc / total;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  vec2 mouseUV = u_mouse / u_resolution;
+  vec2 toMouse = uv - mouseUV;
+  float dM = length(toMouse * vec2(u_resolution.x / u_resolution.y, 1.0));
+  float aberration = smoothstep(0.0, 0.25, dM) * 0.004;
+  vec2 dir = dM > 0.001 ? normalize(toMouse) : vec2(0.0);
+
+  vec3 base;
+  base.r = texture(u_scene, uv + dir * aberration).r;
+  base.g = texture(u_scene, uv).g;
+  base.b = texture(u_scene, uv - dir * aberration).b;
+
+  base += sampleBloom(uv) * u_bloom;
+  float scan = 1.0 - u_crt * 0.18 * (sin(uv.y * u_resolution.y * 3.14159) * 0.5 + 0.5);
+  base *= scan;
+  vec2 vig = uv - 0.5;
+  base *= 1.0 - dot(vig, vig) * 0.6;
+
+  outColor = vec4(base, 1.0);
+}
+</script>
+
+<script>
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false });
+if (!gl) {
+  document.getElementById('gl').replaceWith(Object.assign(document.createElement('div'), { textContent: 'WebGL2 unavailable', style: 'color:#fff;padding:32px' }));
+} else {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const RAMP = ' .\'`,:;!iI?ltjf1234567890[]{}|()*#$@%MW&8B';
+
+  // ───── Locked defaults — match v4-shader.html "image #10" look ─────
+  const CELL_PX     = 4;     // small cells = high detail
+  const RADIUS      = 240;   // cursor reach
+  const PUSH_MAX    = 6;     // SUBTLE: 6px not 26px (alteration not deformation)
+  const COLOR_MODE  = 0;     // amber
+  const CONTRAST    = 1.05;
+  const BRIGHTNESS  = 0.0;
+  const BLOOM       = 0.40;
+  const CRT         = 0.40;
+
+  function compile(t, s) {
+    const sh = gl.createShader(t);
+    gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  }
+  function link(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  const vs = compile(gl.VERTEX_SHADER, document.getElementById('vs').textContent.trim());
+  const fsA = compile(gl.FRAGMENT_SHADER, document.getElementById('fs_ascii').textContent.trim());
+  const fsP = compile(gl.FRAGMENT_SHADER, document.getElementById('fs_post').textContent.trim());
+  const progAscii = link(vs, fsA);
+  const progPost = link(vs, fsP);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  function bindQuad(prog) {
+    const loc = gl.getAttribLocation(prog, 'a_pos');
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  function buildAtlas() {
+    const cellPx = 64, cellH = Math.round(cellPx * 1.55);
+    const ax = 8, ay = Math.ceil(RAMP.length / ax);
+    const c = document.createElement('canvas');
+    c.width = ax * cellPx; c.height = ay * cellH;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, c.width, c.height);
+    cx.font = `600 ${Math.round(cellPx * 1.05)}px 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#fff';
+    for (let i = 0; i < RAMP.length; i++) {
+      const col = i % ax, row = Math.floor(i / ax);
+      cx.fillText(RAMP[i], col * cellPx + cellPx / 2, row * cellH + cellH / 2);
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    return { tex, ax, ay };
+  }
+  const atlas = buildAtlas();
+
+  let imgTex = null, imgSize = [600, 850];
+  function loadImage(src) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (imgTex) gl.deleteTexture(imgTex);
+      imgTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, imgTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      imgSize = [img.naturalWidth || 600, img.naturalHeight || 850];
+    };
+    img.src = src;
+  }
+
+  let fbo = null, fboTex = null, fboW = 0, fboH = 0;
+  function ensureFBO(w, h) {
+    if (fboW === w && fboH === h && fbo) return;
+    if (fbo) { gl.deleteFramebuffer(fbo); gl.deleteTexture(fboTex); }
+    fbo = gl.createFramebuffer();
+    fboTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+    fboW = w; fboH = h;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  function resize() {
+    const heroEl = document.querySelector('.hero');
+    const w = heroEl.clientWidth;
+    const h = heroEl.clientHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ensureFBO(canvas.width, canvas.height);
+  }
+
+  // Mouse — track relative to hero element so it works after scroll
+  const mouse = { x: -9999, y: -9999 };
+  const ms = { x: -9999, y: -9999 };
+  const heroEl = document.querySelector('.hero');
+  heroEl.addEventListener('mousemove', e => {
+    const rect = heroEl.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  heroEl.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+
+  function frame() {
+    ms.x += (mouse.x - ms.x) * 0.2;
+    ms.y += (mouse.y - ms.y) * 0.2;
+    if (!imgTex) { requestAnimationFrame(frame); return; }
+    const W = canvas.width, H = canvas.height;
+    const heroH = heroEl.clientHeight;
+    const mouseGL = [ms.x * dpr, (heroH - ms.y) * dpr];
+
+    // Pass 1
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.022, 0.022, 0.030, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(progAscii);
+    bindQuad(progAscii);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, imgTex);
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_image'), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, atlas.tex);
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_atlas'), 1);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_imgSize'), imgSize[0], imgSize[1]);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_cellPx'), CELL_PX * dpr);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_atlasGrid'), atlas.ax, atlas.ay);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_charCount'), RAMP.length);
+    gl.uniform2f(gl.getUniformLocation(progAscii, 'u_mouse'), mouseGL[0], mouseGL[1]);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_radius'), RADIUS * dpr);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_pushMax'), PUSH_MAX * dpr);
+    gl.uniform1i(gl.getUniformLocation(progAscii, 'u_colorMode'), COLOR_MODE);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_contrast'), CONTRAST);
+    gl.uniform1f(gl.getUniformLocation(progAscii, 'u_brightness'), BRIGHTNESS);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Pass 2
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(progPost);
+    bindQuad(progPost);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.uniform1i(gl.getUniformLocation(progPost, 'u_scene'), 0);
+    gl.uniform2f(gl.getUniformLocation(progPost, 'u_resolution'), W, H);
+    gl.uniform2f(gl.getUniformLocation(progPost, 'u_mouse'), mouseGL[0], mouseGL[1]);
+    gl.uniform1f(gl.getUniformLocation(progPost, 'u_bloom'), BLOOM);
+    gl.uniform1f(gl.getUniformLocation(progPost, 'u_crt'), CRT);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    requestAnimationFrame(frame);
+  }
+
+  const PLACEHOLDER_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 850'>
+    <defs>
+      <radialGradient id='head' cx='40%' cy='35%' r='60%'><stop offset='0%' stop-color='#fff'/><stop offset='60%' stop-color='#aaa'/><stop offset='100%' stop-color='#333'/></radialGradient>
+      <linearGradient id='torso' x1='20%' y1='0%' x2='80%' y2='100%'><stop offset='0%' stop-color='#666'/><stop offset='50%' stop-color='#aaa'/><stop offset='100%' stop-color='#222'/></linearGradient>
+    </defs>
+    <rect width='600' height='850' fill='#050507'/>
+    <ellipse cx='270' cy='150' rx='78' ry='95' fill='url(#head)'/>
+    <path d='M 175 285 Q 210 305 280 295 L 360 295 Q 425 305 440 380 Q 445 440 415 490 Q 360 510 280 500 L 220 490 Q 155 410 175 285 Z' fill='url(#torso)'/>
+    <path d='M 365 320 Q 440 290 445 215 Q 425 192 388 210 Q 365 250 345 290 Z' fill='#888'/>
+    <ellipse cx='418' cy='192' rx='34' ry='28' fill='#ccc'/>
+    <path d='M 215 370 Q 175 470 235 560 Q 280 605 330 625 L 355 605 Q 305 565 280 495 Q 245 425 225 370 Z' fill='#555'/>
+    <path d='M 220 480 Q 245 545 218 635 L 195 800 L 320 800 L 348 635 Q 388 555 348 480 Q 285 495 220 480 Z' fill='#444'/>
+  </svg>`;
+  loadImage('data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG));
+
+  let resizeTO;
+  window.addEventListener('resize', () => { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 80); });
+  resize();
+  requestAnimationFrame(frame);
+}
+
+// Reveal-on-scroll
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold: 0.15 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
