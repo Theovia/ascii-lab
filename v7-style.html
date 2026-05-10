@@ -199,18 +199,14 @@
     const thumbEl = styleStrip.children[idx];
     thumbEl.classList.add('loading');
     setStatus(`descargando ${STYLES[idx].title}…`);
-    try {
-      sessions[idx] = await ort.InferenceSession.create(STYLES[idx].url, {
-        executionProviders: ['webgl', 'wasm'],
-      });
-    } catch (e) {
-      // Try wasm-only
-      sessions[idx] = await ort.InferenceSession.create(STYLES[idx].url, {
-        executionProviders: ['wasm'],
-      });
-    }
+    sessions[idx] = await ort.InferenceSession.create(STYLES[idx].url, {
+      executionProviders: ['wasm'],          // wasm only: webgl EP unstable for FastNeuralStyle ops
+      graphOptimizationLevel: 'all',
+    });
+    sessions[idx]._scaleDetected = null;
     thumbEl.classList.remove('loading');
-    setStatus(`${STYLES[idx].title} listo`);
+    setStatus(`${STYLES[idx].title} listo · ${sessions[idx].inputNames[0]}→${sessions[idx].outputNames[0]}`);
+    console.log(`[v7] loaded ${STYLES[idx].id}`, { inputs: sessions[idx].inputNames, outputs: sessions[idx].outputNames });
     return sessions[idx];
   }
 
@@ -269,14 +265,28 @@
       const outputName = session.outputNames[0];
       const outputArr = result[outputName].data;
 
+      // Auto-detect output range (some models output 0-1, some 0-255)
+      if (session._scaleDetected === null) {
+        let mx = 0;
+        for (let i = 0; i < Math.min(outputArr.length, 5000); i++) {
+          if (outputArr[i] > mx) mx = outputArr[i];
+        }
+        session._scaleDetected = mx < 2 ? 255 : 1;
+        console.log(`[v7] output range max≈${mx.toFixed(2)} → scale ${session._scaleDetected}×`);
+      }
+      const SCALE = session._scaleDetected;
+
       // Convert CHW → RGBA, clip to 0-255
       const outImgData = outputCtx.createImageData(INPUT_SIZE, INPUT_SIZE);
       const outData = outImgData.data;
       const styleMix = strength;
       for (let i = 0; i < N; i++) {
-        const r = Math.max(0, Math.min(255, outputArr[i]));
-        const g = Math.max(0, Math.min(255, outputArr[i + N]));
-        const b = Math.max(0, Math.min(255, outputArr[i + 2 * N]));
+        let r = outputArr[i] * SCALE;
+        let g = outputArr[i + N] * SCALE;
+        let b = outputArr[i + 2 * N] * SCALE;
+        r = r < 0 ? 0 : r > 255 ? 255 : r;
+        g = g < 0 ? 0 : g > 255 ? 255 : g;
+        b = b < 0 ? 0 : b > 255 ? 255 : b;
         if (styleMix < 1.0) {
           const origR = data[i * 4], origG = data[i * 4 + 1], origB = data[i * 4 + 2];
           outData[i * 4]     = r * styleMix + origR * (1 - styleMix);
