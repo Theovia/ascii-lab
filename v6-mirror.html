@@ -90,7 +90,7 @@
 
 <div class="controls">
   <button id="recalibrateBtn">Recalibrar neutral</button>
-  <button id="strengthBtn" data-strength="1">Intensidad · 1.0×</button>
+  <button id="strengthBtn" data-strength="1">Intensidad · 0.7×</button>
   <button id="mirrorBtn" class="active">Mirror</button>
 </div>
 
@@ -179,26 +179,28 @@ void main() {
     return;
   }
 
-  // ───── RBF displacement field ─────
+  // ───── RBF displacement (un-normalized: Gaussian partition of unity) ─────
   vec2 displacement = vec2(0.0);
-  float totalWeight = 0.0;
   if (u_active > 0.5) {
-    // Limit the warp to face region (smooth fade outside face oval)
-    vec2 faceD = (paintingUV - u_paintingFaceCenter) / (u_paintingFaceSize * 0.85);
+    // Tight face-only mask (hard cutoff fade)
+    vec2 faceD = (paintingUV - u_paintingFaceCenter) / (u_paintingFaceSize * 0.65);
     float faceMaskDist = length(faceD);
-    float faceMask = 1.0 - smoothstep(0.85, 1.25, faceMaskDist);
+    float faceMask = 1.0 - smoothstep(0.85, 1.05, faceMaskDist);
 
-    for (int i = 0; i < ANCHOR_COUNT; i++) {
-      vec2 anchor = u_anchorSrc[i];
-      vec2 delta = u_anchorDelta[i];
-      vec2 d = paintingUV - anchor;
-      float d2 = dot(d, d);
-      float w = exp(-d2 / (u_sigma * u_sigma));
-      displacement += delta * w;
-      totalWeight += w;
+    if (faceMask > 0.001) {
+      for (int i = 0; i < ANCHOR_COUNT; i++) {
+        vec2 anchor = u_anchorSrc[i];
+        vec2 delta = u_anchorDelta[i];
+        vec2 d = paintingUV - anchor;
+        float d2 = dot(d, d);
+        float w = exp(-d2 / (u_sigma * u_sigma));
+        displacement += delta * w;
+      }
+      displacement *= faceMask;
+      // Hard cap to avoid fold-over
+      float dispMag = length(displacement);
+      if (dispMag > 0.04) displacement = displacement * (0.04 / dispMag);
     }
-    if (totalWeight > 0.0001) displacement /= totalWeight;
-    displacement *= faceMask;
   }
 
   // Inverse warp: source = current - displacement
@@ -340,7 +342,7 @@ import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@m
   let userCurrentLandmarks = null;
   let userCurrentFaceBox = null;
   let mirror = true;
-  let strength = 1.0;
+  let strength = 0.7;
   let lastDetect = 0;
 
   function detectUserFace(t) {
@@ -384,27 +386,30 @@ import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@m
     return true;
   }
 
-  // ───── Per-frame compute deltas ─────
+  // Smoothed deltas for stability
+  let smoothedDeltas = new Float32Array(ANCHOR_COUNT * 2);
+
   function computeDeltas() {
     if (!userNeutralAnchors || !userCurrentLandmarks || paintingAnchors.length === 0) {
-      return new Float32Array(ANCHOR_COUNT * 2);
+      // Decay to zero when no face
+      for (let i = 0; i < smoothedDeltas.length; i++) smoothedDeltas[i] *= 0.9;
+      return smoothedDeltas;
     }
     const userCurrent = buildAnchorList(userCurrentLandmarks);
-    const out = new Float32Array(ANCHOR_COUNT * 2);
-
-    // Scale ratio between user face and painting face (so deltas are proportional)
     const scaleX = (paintingFaceSize.x / userNeutralFaceBox.size.x) * strength;
     const scaleY = (paintingFaceSize.y / userNeutralFaceBox.size.y) * strength;
+    const MAX_DELTA = 0.025;            // hard cap per anchor in painting UV
+    const SMOOTH = 0.25;                // temporal low-pass
 
     for (let i = 0; i < ANCHOR_COUNT; i++) {
-      // Delta in user UV (current - neutral)
-      const dx = userCurrent[i].x - userNeutralAnchors[i].x;
-      const dy = userCurrent[i].y - userNeutralAnchors[i].y;
-      // Apply to painting UV scaled
-      out[i * 2 + 0] = dx * scaleX;
-      out[i * 2 + 1] = dy * scaleY;
+      let dx = (userCurrent[i].x - userNeutralAnchors[i].x) * scaleX;
+      let dy = (userCurrent[i].y - userNeutralAnchors[i].y) * scaleY;
+      const mag = Math.hypot(dx, dy);
+      if (mag > MAX_DELTA) { dx *= MAX_DELTA / mag; dy *= MAX_DELTA / mag; }
+      smoothedDeltas[i * 2 + 0] += (dx - smoothedDeltas[i * 2 + 0]) * SMOOTH;
+      smoothedDeltas[i * 2 + 1] += (dy - smoothedDeltas[i * 2 + 1]) * SMOOTH;
     }
-    return out;
+    return smoothedDeltas;
   }
 
   function packAnchors() {
@@ -455,7 +460,7 @@ import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@m
     const deltasArr = computeDeltas();
     gl.uniform2fv(gl.getUniformLocation(prog, 'u_anchorSrc'), anchorsArr);
     gl.uniform2fv(gl.getUniformLocation(prog, 'u_anchorDelta'), deltasArr);
-    gl.uniform1f(gl.getUniformLocation(prog, 'u_sigma'), 0.10);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_sigma'), 0.06);
     gl.uniform1f(gl.getUniformLocation(prog, 'u_active'), userNeutralAnchors ? 1.0 : 0.0);
     gl.uniform2f(gl.getUniformLocation(prog, 'u_paintingFaceCenter'), paintingFaceCenter.x, paintingFaceCenter.y);
     gl.uniform2f(gl.getUniformLocation(prog, 'u_paintingFaceSize'), paintingFaceSize.x, paintingFaceSize.y);
@@ -566,7 +571,7 @@ import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@m
     e.target.classList.toggle('active', mirror);
   });
   document.getElementById('strengthBtn').addEventListener('click', e => {
-    const cycle = [1, 1.5, 2, 0.5];
+    const cycle = [0.7, 1.0, 1.5, 0.4];
     const idx = cycle.indexOf(strength);
     strength = cycle[(idx + 1) % cycle.length];
     e.target.textContent = `Intensidad · ${strength.toFixed(1)}×`;
