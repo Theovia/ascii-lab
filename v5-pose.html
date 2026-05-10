@@ -278,7 +278,7 @@ void main() {
 </script>
 
 <script type="module">
-import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs';
+import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs';
 
 (async () => {
   const canvas = document.getElementById('gl');
@@ -362,7 +362,7 @@ import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@m
   let faceLandmarker = null;
   async function initLandmarker() {
     const filesetResolver = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
     );
     faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
