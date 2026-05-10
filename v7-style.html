@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>v7 — Style Transfer en vivo · Eigen Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0907;
+    --ink: #F5EDDC;
+    --soft: rgba(245, 237, 220, 0.50);
+    --line: rgba(245, 237, 220, 0.10);
+    --amber: #D97706;
+    --emerald: #10B981;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; height: 100%; overflow: hidden; }
+  body { cursor: crosshair; }
+  ::selection { background: var(--amber); color: var(--bg); }
+
+  #outputCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; object-fit: contain; image-rendering: -webkit-optimize-contrast; }
+  video#cam { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding: 18px 36px; background: linear-gradient(to bottom, rgba(10,9,7,0.78), transparent); pointer-events: none; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  .nav > * { pointer-events: auto; }
+  .nav .center { justify-self: center; text-align: center; }
+  .nav .right { justify-self: end; display: flex; gap: 22px; }
+  .nav .right a { color: var(--soft); text-decoration: none; }
+  .nav .right a:hover { color: var(--ink); }
+  .nav b { color: var(--amber); }
+
+  .meta { position: fixed; bottom: 32px; left: 36px; z-index: 10; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); line-height: 1.7; pointer-events: none; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .meta .live::before { content: '●'; color: var(--emerald); margin-right: 6px; animation: blink 1.6s ease-in-out infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .title-card { position: fixed; bottom: 32px; right: 36px; z-index: 10; pointer-events: none; text-align: right; max-width: 380px; }
+  .title-card .num { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; font-size: 64px; line-height: 0.85; color: var(--amber); letter-spacing: -0.03em; margin-bottom: 6px; }
+  .title-card .title { font-family: 'Newsreader', serif; font-size: 22px; font-style: italic; font-weight: 400; color: var(--ink); margin-bottom: 4px; }
+  .title-card .author { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); }
+  .title-card .quote { font-family: 'Newsreader', serif; font-style: italic; font-size: 14px; color: var(--soft); margin-top: 14px; line-height: 1.4; }
+
+  .style-strip {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 12;
+    display: flex; gap: 8px;
+    padding: 10px 14px;
+    background: rgba(15,15,20,0.78); backdrop-filter: blur(14px);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  .style-thumb { position: relative; width: 64px; height: 64px; cursor: pointer; border-radius: 2px; overflow: hidden; border: 1px solid var(--line); transition: border-color .2s, transform .2s; }
+  .style-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .style-thumb:hover { transform: scale(1.05); }
+  .style-thumb.active { border-color: var(--amber); }
+  .style-thumb.active::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--amber); }
+  .style-thumb-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: #fff; font-family: 'Geist Mono', monospace; font-size: 8px; padding: 2px 4px; text-align: center; letter-spacing: 0.04em; }
+
+  .controls { position: fixed; top: 80px; right: 36px; z-index: 12; display: flex; flex-direction: column; gap: 8px; }
+  .controls button { padding: 8px 14px; border: 1px solid var(--line); background: rgba(15,15,20,0.78); color: var(--ink); font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; border-radius: 2px; transition: border-color .2s; }
+  .controls button:hover { border-color: var(--amber); }
+  .controls button.active { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+  .controls .slider-group { display: flex; flex-direction: column; gap: 6px; padding: 8px 14px; border: 1px solid var(--line); background: rgba(15,15,20,0.78); border-radius: 2px; min-width: 140px; }
+  .controls .slider-group .label { font-family: 'Geist Mono', monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); display: flex; justify-content: space-between; }
+  .controls .slider-group .label b { color: var(--amber); font-weight: 600; }
+  .controls input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; cursor: ew-resize; margin: 0; }
+  .controls input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line); border-radius: 1px; }
+  .controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; margin-top: -4px; background: var(--amber); border-radius: 50%; border: 2px solid var(--bg); }
+
+  .preview { position: fixed; top: 80px; left: 36px; z-index: 12; width: 160px; height: 120px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #000; opacity: 0.85; }
+  .preview canvas { width: 100%; height: 100%; display: block; }
+  .preview-label { position: absolute; bottom: 6px; left: 8px; font-family: 'Geist Mono', monospace; font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,0.8); pointer-events: none; }
+
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10,9,7,0.95); backdrop-filter: blur(10px); z-index: 50; pointer-events: auto; padding: 24px; transition: opacity 0.4s; }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay-card { text-align: center; max-width: 640px; }
+  .overlay-tag { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--soft); margin-bottom: 18px; }
+  .overlay-h { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; font-size: 44px; line-height: 1.05; color: var(--ink); margin-bottom: 24px; letter-spacing: -0.02em; }
+  .overlay-h em { color: var(--amber); }
+  .overlay-p { font-family: 'Newsreader', serif; font-size: 16px; line-height: 1.55; color: rgba(245,237,220,0.72); margin-bottom: 32px; }
+  .overlay-btn { display: inline-block; padding: 14px 28px; background: var(--amber); color: var(--bg); border: 0; border-radius: 2px; cursor: pointer; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; transition: background .2s; }
+  .overlay-btn:hover { background: #F59E0B; }
+  .overlay-btn:disabled { opacity: 0.5; cursor: wait; }
+  .err { color: #ff4d6d; margin-top: 16px; font-size: 12px; font-family: 'Geist Mono', monospace; }
+  .progress { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--soft); margin-top: 16px; letter-spacing: 0.14em; }
+</style>
+</head>
+<body>
+
+<canvas id="outputCanvas"></canvas>
+<video id="cam" autoplay playsinline muted></video>
+
+<nav class="nav">
+  <div class="left" style="justify-self: start;">EIGEN <b>ATLAS</b> · v7 · neural style transfer</div>
+  <div class="center">MAGENTA · ARBITRARY STYLIZATION · <span id="fpsLabel">— fps</span></div>
+  <div class="right">
+    <a href="https://atelier.eigenatlas.com">← Atelier</a>
+    <a href="https://github.com/Theovia/ascii-lab">github</a>
+  </div>
+</nav>
+
+<div class="style-strip" id="styleStrip">
+  <!-- thumbnails injected dynamically -->
+</div>
+
+<div class="controls">
+  <div class="slider-group">
+    <div class="label"><span>Style strength</span><b id="strengthVal">1.00</b></div>
+    <input type="range" id="strengthSlider" min="0" max="100" step="2" value="100" />
+  </div>
+  <button id="mirrorBtn" class="active">Mirror</button>
+  <button id="snapBtn">Snap PNG</button>
+</div>
+
+<div class="preview">
+  <canvas id="previewCanvas" width="320" height="240"></canvas>
+  <div class="preview-label">tú · live</div>
+</div>
+
+<div class="meta">
+  <span class="live"></span><b id="statusLabel">cargando…</b><br />
+  <span id="modelLabel">MobileNet style + separable transformer</span>
+</div>
+
+<div class="title-card">
+  <div class="num">VII<span style="color: var(--ink); font-style: normal;">.</span></div>
+  <div class="title" id="titleEl">Girl with a Pearl Earring</div>
+  <div class="author" id="authorEl">Johannes Vermeer · 1665</div>
+  <div class="quote">— pintando tu cara en su mismo aliento.</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-tag">— v7 · neural style transfer</div>
+    <h2 class="overlay-h">
+      Tu cara, pintada por <em>el maestro mismo</em>.
+    </h2>
+    <p class="overlay-p">
+      Una red neural arbitraria de transferencia de estilo de Magenta corre en tu navegador. La imagen de la cámara entra como contenido; un cuadro clásico, como estilo. La salida combina ambos a treinta cuadros por segundo, sin nube. Selecciona un cuadro arriba para cambiar de pincel.
+    </p>
+    <button class="overlay-btn" id="startBtn">Activar cámara</button>
+    <div class="progress" id="progressLabel"></div>
+    <div class="err" id="errMsg"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script>
+(async () => {
+  const STYLE_MODEL_URL = 'https://reiinakano.github.io/arbitrary-image-stylization-tfjs/saved_model_style_js/model.json';
+  const TRANSFORM_MODEL_URL = 'https://reiinakano.github.io/arbitrary-image-stylization-tfjs/saved_model_transformer_separable_js/model.json';
+
+  const PAINTINGS = [
+    { url: 'paintings/01-vermeer.jpg',    title: 'Girl with a Pearl Earring',   author: 'Johannes Vermeer · 1665' },
+    { url: 'paintings/02-botticelli.jpg', title: 'The Birth of Venus',          author: 'Sandro Botticelli · 1485' },
+    { url: 'paintings/03-vangogh.jpg',    title: 'The Starry Night',            author: 'Vincent van Gogh · 1889' },
+    { url: 'paintings/04-hokusai.jpg',    title: 'The Great Wave off Kanagawa', author: 'Katsushika Hokusai · 1831' },
+    { url: 'paintings/05-monalisa.jpg',   title: 'La Gioconda (Mona Lisa)',     author: 'Leonardo da Vinci · 1503-1519' },
+  ];
+
+  // ───── DOM refs ─────
+  const outputCanvas = document.getElementById('outputCanvas');
+  const outputCtx = outputCanvas.getContext('2d');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const previewCtx = previewCanvas.getContext('2d');
+  const video = document.getElementById('cam');
+  const styleStrip = document.getElementById('styleStrip');
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let mirror = true;
+  let strength = 1.0;
+  let currentStyleIdx = 0;
+
+  // ───── Painting thumbnails + selector ─────
+  PAINTINGS.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'style-thumb' + (i === 0 ? ' active' : '');
+    el.innerHTML = `<img src="${p.url}" alt="${p.title}" /><div class="style-thumb-label">${p.author.split(' · ')[0].split(' ').pop()}</div>`;
+    el.addEventListener('click', () => selectStyle(i));
+    styleStrip.appendChild(el);
+  });
+
+  // ───── TF.js models ─────
+  let styleNet = null, transformNet = null;
+  let styleVectorCache = null;     // computed style vector for current painting
+
+  function setStatus(txt) { document.getElementById('statusLabel').textContent = txt; }
+  function setProgress(txt) { document.getElementById('progressLabel').textContent = txt; }
+
+  async function loadModels() {
+    setProgress('descargando style net…');
+    styleNet = await tf.loadGraphModel(STYLE_MODEL_URL);
+    setProgress('descargando transform net…');
+    transformNet = await tf.loadGraphModel(TRANSFORM_MODEL_URL);
+    setProgress('precalentando GPU…');
+    // Warm-up with dummy
+    const dummy = tf.zeros([1, 256, 256, 3]);
+    const sv = styleNet.predict(dummy);
+    const out = transformNet.predict([dummy, sv]);
+    out.dispose(); sv.dispose(); dummy.dispose();
+    setProgress('');
+  }
+
+  async function computeStyleVector(imgEl) {
+    return tf.tidy(() => {
+      const t = tf.browser.fromPixels(imgEl).toFloat().div(255).expandDims(0);
+      const resized = tf.image.resizeBilinear(t, [256, 256]);
+      const sv = styleNet.predict(resized);
+      return sv;
+    });
+  }
+
+  async function loadImagePromise(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function selectStyle(idx) {
+    currentStyleIdx = idx;
+    document.querySelectorAll('.style-thumb').forEach((el, i) => el.classList.toggle('active', i === idx));
+    document.getElementById('titleEl').textContent = PAINTINGS[idx].title;
+    document.getElementById('authorEl').textContent = PAINTINGS[idx].author;
+    setStatus('cargando estilo…');
+    const img = await loadImagePromise(PAINTINGS[idx].url);
+    if (styleVectorCache) styleVectorCache.dispose();
+    styleVectorCache = await computeStyleVector(img);
+    setStatus('estilo listo');
+  }
+
+  // ───── Inference loop ─────
+  const INPUT_SIZE = 384;          // bigger = more detail, slower
+  const tmp = document.createElement('canvas');
+  const tmpCtx = tmp.getContext('2d');
+  tmp.width = INPUT_SIZE; tmp.height = INPUT_SIZE;
+
+  let inflight = false;
+  let fpsCount = 0, fpsT0 = performance.now();
+
+  async function stylizeFrame() {
+    if (inflight || !styleVectorCache || !video.videoWidth) return;
+    inflight = true;
+    try {
+      // Draw mirrored video into tmp canvas at INPUT_SIZE square (object-fit cover)
+      const ar = video.videoWidth / video.videoHeight;
+      let sw = video.videoWidth, sh = video.videoHeight, sx = 0, sy = 0;
+      if (ar > 1) { sw = video.videoHeight; sx = (video.videoWidth - sw) / 2; }
+      else        { sh = video.videoWidth;  sy = (video.videoHeight - sh) / 2; }
+
+      tmpCtx.save();
+      if (mirror) { tmpCtx.translate(INPUT_SIZE, 0); tmpCtx.scale(-1, 1); }
+      tmpCtx.drawImage(video, sx, sy, sw, sh, 0, 0, INPUT_SIZE, INPUT_SIZE);
+      tmpCtx.restore();
+
+      // Update preview
+      previewCtx.drawImage(tmp, 0, 0, previewCanvas.width, previewCanvas.height);
+
+      // Inference
+      const stylized = await tf.tidy(() => {
+        const content = tf.browser.fromPixels(tmp).toFloat().div(255).expandDims(0);
+        const out = transformNet.predict([content, styleVectorCache]);
+        return out.squeeze();   // [H, W, 3]
+      });
+
+      // Optionally blend with original (strength)
+      let final = stylized;
+      if (strength < 1.0) {
+        final = tf.tidy(() => {
+          const orig = tf.browser.fromPixels(tmp).toFloat().div(255);
+          return tf.add(tf.mul(orig, 1 - strength), tf.mul(stylized, strength));
+        });
+        stylized.dispose();
+      }
+
+      // Render to output canvas, sized to fill viewport with object-fit contain
+      // First put on a square temp, then upscale with letterbox
+      const W = window.innerWidth, H = window.innerHeight;
+      outputCanvas.width = Math.floor(W * dpr);
+      outputCanvas.height = Math.floor(H * dpr);
+      outputCanvas.style.width = W + 'px';
+      outputCanvas.style.height = H + 'px';
+
+      // Render tensor to small offscreen canvas first, then scale up
+      const off = document.createElement('canvas');
+      off.width = INPUT_SIZE; off.height = INPUT_SIZE;
+      await tf.browser.toPixels(final, off);
+      final.dispose();
+
+      // Letterbox into viewport
+      outputCtx.fillStyle = '#0a0907';
+      outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+      const fitSize = Math.min(W, H) * 0.92 * dpr;
+      const ox = (outputCanvas.width - fitSize) / 2;
+      const oy = (outputCanvas.height - fitSize) / 2;
+      outputCtx.imageSmoothingEnabled = true;
+      outputCtx.imageSmoothingQuality = 'high';
+      outputCtx.drawImage(off, ox, oy, fitSize, fitSize);
+
+      // FPS
+      fpsCount++;
+      const now = performance.now();
+      if (now - fpsT0 > 500) {
+        const fps = fpsCount * 1000 / (now - fpsT0);
+        document.getElementById('fpsLabel').textContent = fps.toFixed(1) + ' fps';
+        fpsCount = 0; fpsT0 = now;
+      }
+    } catch (e) {
+      console.error('stylize fail', e);
+    } finally {
+      inflight = false;
+    }
+  }
+
+  function frame() {
+    stylizeFrame();
+    requestAnimationFrame(frame);
+  }
+
+  // ───── Boot ─────
+  async function start() {
+    const startBtn = document.getElementById('startBtn');
+    startBtn.disabled = true;
+    startBtn.textContent = 'Iniciando…';
+    try {
+      // Setup TF backend
+      await tf.setBackend('webgl');
+      await tf.ready();
+      setProgress('backend: ' + tf.getBackend());
+
+      await loadModels();
+
+      startBtn.textContent = 'Iniciando cámara…';
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 720, height: 720, facingMode: 'user' },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await new Promise(r => video.onloadedmetadata = r);
+      await video.play();
+
+      await selectStyle(0);
+      document.getElementById('overlay').classList.add('hidden');
+      requestAnimationFrame(frame);
+    } catch (e) {
+      console.error(e);
+      document.getElementById('errMsg').textContent = 'Error: ' + e.message;
+      startBtn.disabled = false;
+      startBtn.textContent = 'Activar cámara';
+    }
+  }
+  document.getElementById('startBtn').addEventListener('click', start);
+
+  document.getElementById('mirrorBtn').addEventListener('click', e => {
+    mirror = !mirror; e.target.classList.toggle('active', mirror);
+  });
+
+  document.getElementById('strengthSlider').addEventListener('input', e => {
+    strength = +e.target.value / 100;
+    document.getElementById('strengthVal').textContent = strength.toFixed(2);
+  });
+
+  document.getElementById('snapBtn').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = `style-${PAINTINGS[currentStyleIdx].title.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.png`;
+    link.href = outputCanvas.toDataURL('image/png');
+    link.click();
+  });
+})();
+</script>
+
+</body>
+</html>
